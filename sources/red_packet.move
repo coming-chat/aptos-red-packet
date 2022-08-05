@@ -29,17 +29,17 @@ module RedPacket::red_packet {
         store: SimpleMap<u64, RedPacketInfo>,
     }
 
-    fun this_address(): address {
+    public fun red_packet_address(): address {
         type_info::account_address(&type_info::type_of<RedPackets>())
     }
 
-    fun check_operator(operator_address: address) {
+    public fun check_operator(operator_address: address) {
         assert!(
-            exists<RedPackets>(this_address()),
+            exists<RedPackets>(red_packet_address()),
             error::already_exists(EREDPACKET_NOT_PUBLISHED),
         );
         assert!(
-            this_address() == operator_address,
+            red_packet_address() == operator_address,
             error::invalid_argument(EREDPACKET_INFO_ADDRESS_MISMATCH),
         );
     }
@@ -51,12 +51,12 @@ module RedPacket::red_packet {
     ) {
         let owner_addr = signer::address_of(owner);
         assert!(
-            this_address() == owner_addr,
+            red_packet_address() == owner_addr,
             error::invalid_argument(EREDPACKET_INFO_ADDRESS_MISMATCH),
         );
 
         assert!(
-            !exists<RedPackets>(this_address()),
+            !exists<RedPackets>(red_packet_address()),
             error::already_exists(EREDPACKET_ALREADY_PUBLISHED),
         );
 
@@ -89,7 +89,7 @@ module RedPacket::red_packet {
             error::invalid_argument(EREDPACKET_TOO_MANY),
         );
 
-        let red_packets = borrow_global_mut<RedPackets>(this_address());
+        let red_packets = borrow_global_mut<RedPackets>(red_packet_address());
 
         let id = red_packets.next_id;
 
@@ -126,7 +126,7 @@ module RedPacket::red_packet {
             error::invalid_argument(EACCOUNTS_BALANCES_LEN_MISMATCH),
         );
 
-        let red_packets = borrow_global_mut<RedPackets>(this_address());
+        let red_packets = borrow_global_mut<RedPackets>(red_packet_address());
         assert!(
             simple_map::contains_key(& red_packets.store, &id),
             error::not_found(EREDPACKET_NOT_FOUND),
@@ -170,7 +170,7 @@ module RedPacket::red_packet {
         let operator_address = signer::address_of(operator);
         check_operator(operator_address);
 
-        let red_packets = borrow_global_mut<RedPackets>(this_address());
+        let red_packets = borrow_global_mut<RedPackets>(red_packet_address());
         assert!(
             simple_map::contains_key(& red_packets.store, &id),
             error::not_found(EREDPACKET_NOT_FOUND),
@@ -179,5 +179,63 @@ module RedPacket::red_packet {
         let info = simple_map::borrow_mut(&mut red_packets.store, &id);
 
         coin::deposit(red_packets.beneficiary, coin::extract_all(&mut info.coin));
+    }
+
+    public fun escrow_aptos_coin(
+        id: u64
+    ): u64 acquires RedPackets {
+        assert!(
+            exists<RedPackets>(red_packet_address()),
+            error::already_exists(EREDPACKET_NOT_PUBLISHED),
+        );
+
+        let red_packets = borrow_global<RedPackets>(red_packet_address());
+        assert!(
+            simple_map::contains_key(& red_packets.store, &id),
+            error::not_found(EREDPACKET_NOT_FOUND),
+        );
+
+        let info = simple_map::borrow(&red_packets.store, &id);
+
+        coin::value(&info.coin)
+    }
+
+    public fun remain_count(
+        id: u64
+    ): u64 acquires RedPackets {
+        assert!(
+            exists<RedPackets>(red_packet_address()),
+            error::already_exists(EREDPACKET_NOT_PUBLISHED),
+        );
+
+        let red_packets = borrow_global<RedPackets>(red_packet_address());
+        assert!(
+            simple_map::contains_key(& red_packets.store, &id),
+            error::not_found(EREDPACKET_NOT_FOUND),
+        );
+
+        let info = simple_map::borrow(&red_packets.store, &id);
+
+        info.remain_count
+    }
+
+    public fun current_id(): u64 acquires RedPackets {
+        assert!(
+            exists<RedPackets>(red_packet_address()),
+            error::already_exists(EREDPACKET_NOT_PUBLISHED),
+        );
+
+        let red_packets = borrow_global<RedPackets>(red_packet_address());
+        red_packets.next_id
+    }
+
+    public fun beneficiary(): address acquires RedPackets {
+        assert!(
+            exists<RedPackets>(red_packet_address()),
+            error::already_exists(EREDPACKET_NOT_PUBLISHED),
+        );
+
+        let red_packets = borrow_global<RedPackets>(red_packet_address());
+        red_packets.beneficiary
     }
 }
