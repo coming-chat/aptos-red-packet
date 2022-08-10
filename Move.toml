@@ -1,6 +1,8 @@
 [package]
 name = "red-packet"
 version = "0.1.0"
+authors = "ComingChat Authors"
+license = "Apache-2.0"
 
 [dependencies]
 #AptosFramework = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/aptos-framework/", rev = "b718154c93b3556658c8c06341be0cf47957188c" }
