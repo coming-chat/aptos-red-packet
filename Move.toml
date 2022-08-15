@@ -1,7 +1,6 @@
 [package]
 name = "red-packet"
 version = "0.1.0"
-authors = "ComingChat Authors"
 license = "Apache-2.0"
 
 [dependencies]

@@ -1,20 +1,3 @@
-/**
- *  Copyright 2022 ComingChat Authors.
- *
- *  Licensed under the Apache License, Version 2.0 (the "License");
- *  you may not use this file except in compliance with the License.
- *  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
- *
- */
-
 #[test_only]
 module std::red_packet_tests {
     use std::signer;
@@ -66,7 +49,12 @@ module std::red_packet_tests {
         initialze(lucky, beneficiary);
     }
 
-    #[test(core_resources = @core_resources, aptos_framework = @aptos_framework, operator = @0x123, beneficiary = @0x234)]
+    #[test(
+        core_resources = @core_resources,
+        aptos_framework = @aptos_framework,
+        operator = @0x123,
+        beneficiary = @0x234
+    )]
     fun create_should_work(
         core_resources: signer,
         aptos_framework: signer,
@@ -142,6 +130,7 @@ module std::red_packet_tests {
         core_resources = @core_resources,
         aptos_framework = @aptos_framework,
         operator = @0x123,
+        creator  = @0x222,
         beneficiary = @0x234,
         lucky1 = @0x888,
         lucky2 =@0x999,
@@ -150,31 +139,32 @@ module std::red_packet_tests {
         core_resources: signer,
         aptos_framework: signer,
         operator: signer,
+        creator: signer,
         beneficiary: signer,
         lucky1: signer,
         lucky2: signer,
     ) {
         let (mint_cap, burn_cap) = aptos_coin::initialize(&aptos_framework, &core_resources);
-        setup_aptos(&aptos_framework, &operator, 100);
+        setup_aptos(&aptos_framework, &creator, 100);
         setup_aptos(&aptos_framework, &beneficiary, 0);
         setup_aptos(&aptos_framework, &lucky1, 0);
         setup_aptos(&aptos_framework, &lucky2, 0);
         coin::destroy_mint_cap<AptosCoin>(mint_cap);
         coin::destroy_burn_cap<AptosCoin>(burn_cap);
 
-        let operator_addr = signer::address_of(&operator);
+        let creator_addr = signer::address_of(&creator);
         let beneficiary_addr = signer::address_of(&beneficiary);
 
         initialze(&operator, beneficiary_addr);
 
-        assert!(coin::balance<AptosCoin>(operator_addr) == 100, 0);
+        assert!(coin::balance<AptosCoin>(creator_addr) == 100, 0);
 
-        create(&operator, 3, 30);
+        create(&creator, 3, 30);
 
         assert!(red_packet::current_id() == 2, 1);
         assert!(red_packet::remain_count(1) == 3, 2);
         assert!(red_packet::escrow_aptos_coin(1) == 30, 3);
-        assert!(coin::balance<AptosCoin>(operator_addr) == 70, 4);
+        assert!(coin::balance<AptosCoin>(creator_addr) == 70, 4);
         assert!(coin::balance<AptosCoin>(beneficiary_addr) == 0, 5);
 
         let accounts = vector::empty<address>();
