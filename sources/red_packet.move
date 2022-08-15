@@ -1,5 +1,6 @@
 /// Copyright 2022 ComingChat Authors. Licensed under Apache-2.0 License.
 module RedPacket::red_packet {
+    use std::acl;
     use std::signer;
     use std::error;
     use std::vector;
@@ -11,7 +12,7 @@ module RedPacket::red_packet {
     const MAX_COUNT: u64 = 1000;
 
     const ENOT_ENOUGH_COIN: u64 = 1;
-    const EREDPACKET_INFO_ADDRESS_MISMATCH: u64 = 2;
+    const EREDPACKET_PERMISSION_DENIED: u64 = 2;
     const EREDPACKET_ALREADY_PUBLISHED: u64 = 3;
     const EACCOUNTS_BALANCES_LEN_MISMATCH: u64 = 4;
     const EREDPACKET_INSUFFICIENT_BALANCES: u64 = 5;
@@ -28,32 +29,37 @@ module RedPacket::red_packet {
         next_id: u64,
         beneficiary: address,
         store: SimpleMap<u64, RedPacketInfo>,
+        admins: acl::ACL,
     }
 
     public fun red_packet_address(): address {
         type_info::account_address(&type_info::type_of<RedPackets>())
     }
 
-    public fun check_operator(operator_address: address, is_admin: bool) {
+    public fun check_operator(
+        operator_address: address,
+        require_admin: bool
+    ) acquires RedPackets {
         assert!(
             exists<RedPackets>(red_packet_address()),
             error::already_exists(EREDPACKET_NOT_PUBLISHED),
         );
         assert!(
-            !is_admin || red_packet_address() == operator_address,
-            error::invalid_argument(EREDPACKET_INFO_ADDRESS_MISMATCH),
+            !require_admin || contains(operator_address) || red_packet_address() == operator_address,
+            error::invalid_argument(EREDPACKET_PERMISSION_DENIED),
         );
     }
 
     // call by comingchat
     public entry fun initialze(
         owner: &signer,
-        beneficiary: address
+        beneficiary: address,
+        admin: address,
     ) {
         let owner_addr = signer::address_of(owner);
         assert!(
             red_packet_address() == owner_addr,
-            error::invalid_argument(EREDPACKET_INFO_ADDRESS_MISMATCH),
+            error::invalid_argument(EREDPACKET_PERMISSION_DENIED),
         );
 
         assert!(
@@ -64,9 +70,11 @@ module RedPacket::red_packet {
         let red_packets = RedPackets{
             next_id: 1,
             beneficiary,
-            store: simple_map::create<u64, RedPacketInfo>()
+            store: simple_map::create<u64, RedPacketInfo>(),
+            admins: acl::empty(),
         };
 
+        acl::add(&mut red_packets.admins, admin);
         move_to(owner, red_packets)
     }
 
@@ -180,6 +188,43 @@ module RedPacket::red_packet {
         let info = simple_map::borrow_mut(&mut red_packets.store, &id);
 
         coin::deposit(red_packets.beneficiary, coin::extract_all(&mut info.coin));
+    }
+
+    /// call by comingchat
+    public entry fun add_admin(
+        owner: &signer,
+        admin: address
+    ) acquires RedPackets {
+        let operator_address = signer::address_of(owner);
+        assert!(
+            red_packet_address() == operator_address,
+            error::invalid_argument(EREDPACKET_PERMISSION_DENIED),
+        );
+
+        let red_packets = borrow_global_mut<RedPackets>(operator_address);
+        acl::add(&mut red_packets.admins, admin);
+    }
+
+    /// call by comingchat
+    public entry fun remove_admin(
+        owner: &signer,
+        admin: address
+    ) acquires RedPackets {
+        let operator_address = signer::address_of(owner);
+        assert!(
+            red_packet_address() == operator_address,
+            error::invalid_argument(EREDPACKET_PERMISSION_DENIED),
+        );
+
+        let red_packets = borrow_global_mut<RedPackets>(operator_address);
+        acl::remove(&mut red_packets.admins, admin);
+    }
+
+    public fun contains(
+        admin: address
+    ): bool acquires RedPackets {
+        let red_packets = borrow_global<RedPackets>(red_packet_address());
+        acl::contains(&red_packets.admins, admin)
     }
 
     public fun escrow_aptos_coin(

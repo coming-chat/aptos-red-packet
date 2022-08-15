@@ -6,7 +6,8 @@ module std::red_packet_tests {
     use aptos_framework::coin;
 
     use RedPacket::red_packet::{
-        Self, initialze, check_operator, create, open, close
+        Self, initialze, check_operator, create, open, close,
+        add_admin, remove_admin, contains
     };
 
     #[test_only]
@@ -26,27 +27,27 @@ module std::red_packet_tests {
 
         let operator_addr = signer::address_of(operator);
 
-        initialze(operator, beneficiary);
+        initialze(operator, beneficiary, beneficiary);
 
         check_operator(operator_addr, true);
     }
 
     #[test(operator = @0x123, beneficiary = @0x234)]
-    #[expected_failure]
+    #[expected_failure(abort_code = 524291)]
     fun initialize_twice_should_fail(operator: &signer, beneficiary: address) {
         let operator_addr = signer::address_of(operator);
 
-        initialze(operator, beneficiary);
+        initialze(operator, beneficiary, beneficiary);
 
         check_operator(operator_addr, true);
 
-        initialze(operator, beneficiary);
+        initialze(operator, beneficiary, beneficiary);
     }
 
     #[test(beneficiary = @0x234, lucky = @0x345)]
-    #[expected_failure]
+    #[expected_failure(abort_code = 65538)]
     fun initialize_other_should_fail(lucky: &signer, beneficiary: address) {
-        initialze(lucky, beneficiary);
+        initialze(lucky, beneficiary, beneficiary);
     }
 
     #[test(
@@ -66,7 +67,7 @@ module std::red_packet_tests {
         coin::destroy_mint_cap<AptosCoin>(mint_cap);
         coin::destroy_burn_cap<AptosCoin>(burn_cap);
 
-        initialze(&operator, beneficiary);
+        initialze(&operator, beneficiary, beneficiary);
 
         create(&operator, 10, 100);
     }
@@ -96,7 +97,7 @@ module std::red_packet_tests {
 
         let operator_addr = signer::address_of(&operator);
 
-        initialze(&operator, beneficiary);
+        initialze(&operator, beneficiary, beneficiary);
 
         assert!(coin::balance<AptosCoin>(operator_addr) == 100, 0);
 
@@ -155,7 +156,7 @@ module std::red_packet_tests {
         let creator_addr = signer::address_of(&creator);
         let beneficiary_addr = signer::address_of(&beneficiary);
 
-        initialze(&operator, beneficiary_addr);
+        initialze(&operator, beneficiary_addr, beneficiary_addr);
 
         assert!(coin::balance<AptosCoin>(creator_addr) == 100, 0);
 
@@ -187,5 +188,53 @@ module std::red_packet_tests {
         assert!(coin::balance<AptosCoin>(lucky1_addr) == 1, 8);
         assert!(coin::balance<AptosCoin>(lucky2_addr) == 9, 9);
         assert!(coin::balance<AptosCoin>(beneficiary_addr) == 20, 10);
+    }
+
+    #[test(
+        core_resources = @core_resources,
+        aptos_framework = @aptos_framework,
+        operator = @0x123,
+        beneficiary = @0x234,
+        admin = @0x345,
+        new_admin = @0x456,
+    )]
+    fun admins_add_remove_should_work(
+        core_resources: signer,
+        aptos_framework: signer,
+        operator: signer,
+        beneficiary: address,
+        admin: signer,
+        new_admin: signer,
+    ) {
+        let (mint_cap, burn_cap) = aptos_coin::initialize(&aptos_framework, &core_resources);
+        setup_aptos(&aptos_framework, &admin, 100);
+        setup_aptos(&aptos_framework, &new_admin, 100);
+        coin::destroy_mint_cap<AptosCoin>(mint_cap);
+        coin::destroy_burn_cap<AptosCoin>(burn_cap);
+
+        let operator_addr = signer::address_of(&operator);
+        let admin_addr = signer::address_of(&admin);
+        let new_admin_addr = signer::address_of(&new_admin);
+
+        initialze(&operator, beneficiary, admin_addr);
+        check_operator(operator_addr, true);
+
+        assert!(contains(admin_addr), 11);
+
+        remove_admin(&operator, admin_addr);
+        assert!(!contains(admin_addr), 12);
+
+        add_admin(&operator, new_admin_addr);
+        assert!(!contains(admin_addr), 13);
+        assert!(contains(new_admin_addr), 14);
+
+        create(&new_admin, 1, 10);
+
+        let accounts = vector::empty<address>();
+        vector::push_back(&mut accounts, new_admin_addr);
+        let balances = vector::empty<u64>();
+        vector::push_back(&mut balances, 10);
+
+        open(&new_admin, 1, accounts, balances);
     }
 }
