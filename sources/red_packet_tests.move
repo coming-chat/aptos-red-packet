@@ -45,7 +45,7 @@ module std::red_packet_tests {
 
         initialze(operator, beneficiary);
 
-        check_operator(operator_addr);
+        check_operator(operator_addr, true);
     }
 
     #[test(operator = @0x123, beneficiary = @0x234)]
@@ -55,7 +55,7 @@ module std::red_packet_tests {
 
         initialze(operator, beneficiary);
 
-        check_operator(operator_addr);
+        check_operator(operator_addr, true);
 
         initialze(operator, beneficiary);
     }

@@ -49,13 +49,13 @@ module RedPacket::red_packet {
         type_info::account_address(&type_info::type_of<RedPackets>())
     }
 
-    public fun check_operator(operator_address: address) {
+    public fun check_operator(operator_address: address, is_admin: bool) {
         assert!(
             exists<RedPackets>(red_packet_address()),
             error::already_exists(EREDPACKET_NOT_PUBLISHED),
         );
         assert!(
-            red_packet_address() == operator_address,
+            !is_admin || red_packet_address() == operator_address,
             error::invalid_argument(EREDPACKET_INFO_ADDRESS_MISMATCH),
         );
     }
@@ -85,7 +85,7 @@ module RedPacket::red_packet {
         move_to(owner, red_packets)
     }
 
-    // call by comingchat
+    // call by anyone in comingchat
     public entry fun create(
         operator: &signer,
         count: u64,
@@ -93,7 +93,7 @@ module RedPacket::red_packet {
     ) acquires RedPackets {
         let operator_address = signer::address_of(operator);
 
-        check_operator(operator_address);
+        check_operator(operator_address, false);
 
         assert!(
             coin::balance<AptosCoin>(operator_address) >= total_balance,
@@ -133,7 +133,7 @@ module RedPacket::red_packet {
         balances: vector<u64>
     ) acquires RedPackets {
         let operator_address = signer::address_of(operator);
-        check_operator(operator_address);
+        check_operator(operator_address, true);
 
         let accounts_len = vector::length(&lucky_accounts);
         let balances_len = vector::length(&balances);
@@ -184,7 +184,7 @@ module RedPacket::red_packet {
         id: u64
     ) acquires RedPackets {
         let operator_address = signer::address_of(operator);
-        check_operator(operator_address);
+        check_operator(operator_address, true);
 
         let red_packets = borrow_global_mut<RedPackets>(red_packet_address());
         assert!(
