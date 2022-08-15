@@ -7,7 +7,7 @@ module std::red_packet_tests {
 
     use RedPacket::red_packet::{
         Self, initialze, check_operator, create, open, close,
-        add_admin, remove_admin, contains
+        add_admin, remove_admin, contains, set_fee_point, fee_point
     };
 
     #[test_only]
@@ -60,16 +60,21 @@ module std::red_packet_tests {
         core_resources: signer,
         aptos_framework: signer,
         operator: signer,
-        beneficiary: address
+        beneficiary: signer
     ) {
         let (mint_cap, burn_cap) = aptos_coin::initialize(&aptos_framework, &core_resources);
-        setup_aptos(&aptos_framework, &operator, 100);
+        setup_aptos(&aptos_framework, &operator, 10000);
+        setup_aptos(&aptos_framework, &beneficiary, 0);
         coin::destroy_mint_cap<AptosCoin>(mint_cap);
         coin::destroy_burn_cap<AptosCoin>(burn_cap);
 
-        initialze(&operator, beneficiary, beneficiary);
+        let beneficiary_addr = signer::address_of(&beneficiary);
 
-        create(&operator, 10, 100);
+        initialze(&operator, beneficiary_addr, beneficiary_addr);
+
+        create(&operator, 10, 10000);
+
+        assert!(coin::balance<AptosCoin>(beneficiary_addr) == 250, 15);
     }
 
     #[test(
@@ -84,20 +89,22 @@ module std::red_packet_tests {
         core_resources: signer,
         aptos_framework: signer,
         operator: signer,
-        beneficiary: address,
+        beneficiary: signer,
         lucky1: signer,
         lucky2: signer,
     ) {
         let (mint_cap, burn_cap) = aptos_coin::initialize(&aptos_framework, &core_resources);
         setup_aptos(&aptos_framework, &operator, 100);
+        setup_aptos(&aptos_framework, &beneficiary, 0);
         setup_aptos(&aptos_framework, &lucky1, 0);
         setup_aptos(&aptos_framework, &lucky2, 0);
         coin::destroy_mint_cap<AptosCoin>(mint_cap);
         coin::destroy_burn_cap<AptosCoin>(burn_cap);
 
         let operator_addr = signer::address_of(&operator);
+        let beneficiary_addr = signer::address_of(&beneficiary);
 
-        initialze(&operator, beneficiary, beneficiary);
+        initialze(&operator, beneficiary_addr, beneficiary_addr);
 
         assert!(coin::balance<AptosCoin>(operator_addr) == 100, 0);
 
@@ -202,21 +209,24 @@ module std::red_packet_tests {
         core_resources: signer,
         aptos_framework: signer,
         operator: signer,
-        beneficiary: address,
+        beneficiary: signer,
         admin: signer,
         new_admin: signer,
     ) {
         let (mint_cap, burn_cap) = aptos_coin::initialize(&aptos_framework, &core_resources);
         setup_aptos(&aptos_framework, &admin, 100);
+        setup_aptos(&aptos_framework, &beneficiary, 0);
         setup_aptos(&aptos_framework, &new_admin, 100);
+
         coin::destroy_mint_cap<AptosCoin>(mint_cap);
         coin::destroy_burn_cap<AptosCoin>(burn_cap);
 
         let operator_addr = signer::address_of(&operator);
+        let beneficiary_addr = signer::address_of(&beneficiary);
         let admin_addr = signer::address_of(&admin);
         let new_admin_addr = signer::address_of(&new_admin);
 
-        initialze(&operator, beneficiary, admin_addr);
+        initialze(&operator, beneficiary_addr, admin_addr);
         check_operator(operator_addr, true);
 
         assert!(contains(admin_addr), 11);
@@ -236,5 +246,42 @@ module std::red_packet_tests {
         vector::push_back(&mut balances, 10);
 
         open(&new_admin, 1, accounts, balances);
+    }
+
+    #[test(
+        core_resources = @core_resources,
+        aptos_framework = @aptos_framework,
+        operator = @0x123,
+        beneficiary = @0x234,
+        admin = @0x345,
+    )]
+    fun set_point_should_work(
+        core_resources: signer,
+        aptos_framework: signer,
+        operator: signer,
+        beneficiary: signer,
+        admin: signer,
+    ) {
+        let (mint_cap, burn_cap) = aptos_coin::initialize(&aptos_framework, &core_resources);
+        setup_aptos(&aptos_framework, &admin, 100);
+        setup_aptos(&aptos_framework, &beneficiary, 0);
+
+        coin::destroy_mint_cap<AptosCoin>(mint_cap);
+        coin::destroy_burn_cap<AptosCoin>(burn_cap);
+
+        let operator_addr = signer::address_of(&operator);
+        let beneficiary_addr = signer::address_of(&beneficiary);
+        let admin_addr = signer::address_of(&admin);
+
+        initialze(&operator, beneficiary_addr, admin_addr);
+        check_operator(operator_addr, true);
+
+        // 2.5%
+        assert!(fee_point() == 250, 16);
+
+        set_fee_point(&operator, 100);
+
+        // 1%
+        assert!(fee_point() == 100, 17);
     }
 }

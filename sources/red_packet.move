@@ -10,6 +10,7 @@ module RedPacket::red_packet {
     use aptos_framework::coin::{Self, Coin};
 
     const MAX_COUNT: u64 = 1000;
+    const INIT_FEE_POINT: u8 = 250; // 2.5%
 
     const ENOT_ENOUGH_COIN: u64 = 1;
     const EREDPACKET_PERMISSION_DENIED: u64 = 2;
@@ -30,6 +31,7 @@ module RedPacket::red_packet {
         beneficiary: address,
         store: SimpleMap<u64, RedPacketInfo>,
         admins: acl::ACL,
+        fee_point: u8,
     }
 
     public fun red_packet_address(): address {
@@ -72,6 +74,7 @@ module RedPacket::red_packet {
             beneficiary,
             store: simple_map::create<u64, RedPacketInfo>(),
             admins: acl::empty(),
+            fee_point: INIT_FEE_POINT
         };
 
         acl::add(&mut red_packets.admins, admin);
@@ -107,8 +110,13 @@ module RedPacket::red_packet {
             remain_count: count,
         };
 
-        let coin = coin::withdraw<AptosCoin>(operator, total_balance);
-        coin::merge(&mut info.coin, coin);
+        let (fee, escrow) = calculate_fee(total_balance, red_packets.fee_point);
+        let fee_coin = coin::withdraw<AptosCoin>(operator, fee);
+
+        coin::deposit<AptosCoin>(red_packets.beneficiary, fee_coin);
+
+        let escrow_coin = coin::withdraw<AptosCoin>(operator, escrow);
+        coin::merge(&mut info.coin, escrow_coin);
 
         simple_map::add(&mut red_packets.store, id, info);
 
@@ -220,6 +228,29 @@ module RedPacket::red_packet {
         acl::remove(&mut red_packets.admins, admin);
     }
 
+    public entry fun set_fee_point(
+        owner: &signer,
+        new_fee_point: u8,
+    ) acquires RedPackets {
+        let operator_address = signer::address_of(owner);
+        assert!(
+            red_packet_address() == operator_address,
+            error::invalid_argument(EREDPACKET_PERMISSION_DENIED),
+        );
+        let red_packets = borrow_global_mut<RedPackets>(operator_address);
+        red_packets.fee_point = new_fee_point;
+    }
+
+    public fun calculate_fee(
+        balance: u64,
+        fee_point: u8,
+    ): (u64, u64) {
+        let fee = balance / 10000 * (fee_point as u64);
+
+        // never overflow)
+        (fee, balance - fee)
+    }
+
     public fun contains(
         admin: address
     ): bool acquires RedPackets {
@@ -284,4 +315,15 @@ module RedPacket::red_packet {
         let red_packets = borrow_global<RedPackets>(red_packet_address());
         red_packets.beneficiary
     }
+
+    public fun fee_point(): u8 acquires RedPackets {
+        assert!(
+            exists<RedPackets>(red_packet_address()),
+            error::already_exists(EREDPACKET_NOT_PUBLISHED),
+        );
+
+        let red_packets = borrow_global<RedPackets>(red_packet_address());
+        red_packets.fee_point
+    }
+
 }
