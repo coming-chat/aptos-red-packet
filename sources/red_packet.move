@@ -206,14 +206,11 @@ module RedPacket::red_packet {
 
     /// call by comingchat
     public entry fun set_admin(
-        owner: &signer,
+        operator: &signer,
         admin: address
     ) acquires RedPackets {
-        let operator_address = signer::address_of(owner);
-        assert!(
-            red_packet_address() == operator_address,
-            error::invalid_argument(EREDPACKET_PERMISSION_DENIED),
-        );
+        let operator_address = signer::address_of(operator);
+        check_operator(operator_address, true);
 
         let red_packets = borrow_global_mut<RedPackets>(operator_address);
         red_packets.admin = admin;
