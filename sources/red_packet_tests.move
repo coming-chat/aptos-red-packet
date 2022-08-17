@@ -51,18 +51,16 @@ module std::red_packet_tests {
     }
 
     #[test(
-        core_resources = @core_resources,
         aptos_framework = @aptos_framework,
         operator = @0x123,
         beneficiary = @0x234
     )]
     fun create_should_work(
-        core_resources: signer,
         aptos_framework: signer,
         operator: signer,
         beneficiary: signer
     ) {
-        let (mint_cap, burn_cap) = aptos_coin::initialize(&aptos_framework, &core_resources);
+        let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(&aptos_framework);
         setup_aptos(&aptos_framework, &operator, 10000);
         setup_aptos(&aptos_framework, &beneficiary, 0);
         coin::destroy_mint_cap<AptosCoin>(mint_cap);
@@ -78,7 +76,6 @@ module std::red_packet_tests {
     }
 
     #[test(
-        core_resources = @core_resources,
         aptos_framework = @aptos_framework,
         operator = @0x123,
         beneficiary = @0x234,
@@ -86,14 +83,13 @@ module std::red_packet_tests {
         lucky2 =@0x999,
     )]
     fun open_should_work(
-        core_resources: signer,
         aptos_framework: signer,
         operator: signer,
         beneficiary: signer,
         lucky1: signer,
         lucky2: signer,
     ) {
-        let (mint_cap, burn_cap) = aptos_coin::initialize(&aptos_framework, &core_resources);
+        let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(&aptos_framework);
         setup_aptos(&aptos_framework, &operator, 100);
         setup_aptos(&aptos_framework, &beneficiary, 0);
         setup_aptos(&aptos_framework, &lucky1, 0);
@@ -135,7 +131,6 @@ module std::red_packet_tests {
     }
 
     #[test(
-        core_resources = @core_resources,
         aptos_framework = @aptos_framework,
         operator = @0x123,
         creator  = @0x222,
@@ -144,7 +139,6 @@ module std::red_packet_tests {
         lucky2 =@0x999,
     )]
     fun close_should_work(
-        core_resources: signer,
         aptos_framework: signer,
         operator: signer,
         creator: signer,
@@ -152,7 +146,7 @@ module std::red_packet_tests {
         lucky1: signer,
         lucky2: signer,
     ) {
-        let (mint_cap, burn_cap) = aptos_coin::initialize(&aptos_framework, &core_resources);
+        let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(&aptos_framework);
         setup_aptos(&aptos_framework, &creator, 100);
         setup_aptos(&aptos_framework, &beneficiary, 0);
         setup_aptos(&aptos_framework, &lucky1, 0);
@@ -198,7 +192,6 @@ module std::red_packet_tests {
     }
 
     #[test(
-        core_resources = @core_resources,
         aptos_framework = @aptos_framework,
         operator = @0x123,
         beneficiary = @0x234,
@@ -206,14 +199,13 @@ module std::red_packet_tests {
         new_admin = @0x456,
     )]
     fun admins_add_remove_should_work(
-        core_resources: signer,
         aptos_framework: signer,
         operator: signer,
         beneficiary: signer,
         admin: signer,
         new_admin: signer,
     ) {
-        let (mint_cap, burn_cap) = aptos_coin::initialize(&aptos_framework, &core_resources);
+        let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(&aptos_framework);
         setup_aptos(&aptos_framework, &admin, 100);
         setup_aptos(&aptos_framework, &beneficiary, 0);
         setup_aptos(&aptos_framework, &new_admin, 100);
@@ -249,20 +241,18 @@ module std::red_packet_tests {
     }
 
     #[test(
-        core_resources = @core_resources,
         aptos_framework = @aptos_framework,
         operator = @0x123,
         beneficiary = @0x234,
         admin = @0x345,
     )]
     fun set_point_should_work(
-        core_resources: signer,
         aptos_framework: signer,
         operator: signer,
         beneficiary: signer,
         admin: signer,
     ) {
-        let (mint_cap, burn_cap) = aptos_coin::initialize(&aptos_framework, &core_resources);
+        let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(&aptos_framework);
         setup_aptos(&aptos_framework, &admin, 100);
         setup_aptos(&aptos_framework, &beneficiary, 0);
 
