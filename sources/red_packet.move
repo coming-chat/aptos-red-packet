@@ -1,6 +1,5 @@
 /// Copyright 2022 ComingChat Authors. Licensed under Apache-2.0 License.
 module RedPacket::red_packet {
-    use std::acl;
     use std::signer;
     use std::error;
     use std::vector;
@@ -11,6 +10,7 @@ module RedPacket::red_packet {
 
     const MAX_COUNT: u64 = 1000;
     const INIT_FEE_POINT: u8 = 250; // 2.5%
+    const BASE_PREPAID_FEE: u64 = 1 * 4; // gas_price * gas_used
 
     const ENOT_ENOUGH_COIN: u64 = 1;
     const EREDPACKET_PERMISSION_DENIED: u64 = 2;
@@ -30,8 +30,9 @@ module RedPacket::red_packet {
         next_id: u64,
         beneficiary: address,
         store: SimpleMap<u64, RedPacketInfo>,
-        admins: acl::ACL,
+        admin: address,
         fee_point: u8,
+        base_prepaid: u64,
     }
 
     public fun red_packet_address(): address {
@@ -47,7 +48,7 @@ module RedPacket::red_packet {
             error::already_exists(EREDPACKET_NOT_PUBLISHED),
         );
         assert!(
-            !require_admin || contains(operator_address) || red_packet_address() == operator_address,
+            !require_admin || admin() == operator_address || red_packet_address() == operator_address,
             error::invalid_argument(EREDPACKET_PERMISSION_DENIED),
         );
     }
@@ -73,11 +74,11 @@ module RedPacket::red_packet {
             next_id: 1,
             beneficiary,
             store: simple_map::create<u64, RedPacketInfo>(),
-            admins: acl::empty(),
-            fee_point: INIT_FEE_POINT
+            admin,
+            fee_point: INIT_FEE_POINT,
+            base_prepaid: BASE_PREPAID_FEE
         };
 
-        acl::add(&mut red_packets.admins, admin);
         move_to(owner, red_packets)
     }
 
@@ -110,9 +111,13 @@ module RedPacket::red_packet {
             remain_count: count,
         };
 
-        let (fee, escrow) = calculate_fee(total_balance, red_packets.fee_point);
+        let prepaid_fee = count * red_packets.base_prepaid;
+        let (fee,  escrow) = calculate_fee(total_balance, red_packets.fee_point);
         let fee_coin = coin::withdraw<AptosCoin>(operator, fee);
-
+        if (fee > prepaid_fee) {
+            let prepaid_coin = coin::extract(&mut fee_coin, prepaid_fee);
+            coin::deposit<AptosCoin>(red_packets.admin, prepaid_coin);
+        };
         coin::deposit<AptosCoin>(red_packets.beneficiary, fee_coin);
 
         let escrow_coin = coin::withdraw<AptosCoin>(operator, escrow);
@@ -126,6 +131,7 @@ module RedPacket::red_packet {
     // offchain check
     // 1. deduplicate lucky accounts
     // 2. check lucky account is exsist
+    // 3. check total balance
     // call by comingchat
     public entry fun open(
         operator: &signer,
@@ -199,7 +205,7 @@ module RedPacket::red_packet {
     }
 
     /// call by comingchat
-    public entry fun add_admin(
+    public entry fun set_admin(
         owner: &signer,
         admin: address
     ) acquires RedPackets {
@@ -210,22 +216,7 @@ module RedPacket::red_packet {
         );
 
         let red_packets = borrow_global_mut<RedPackets>(operator_address);
-        acl::add(&mut red_packets.admins, admin);
-    }
-
-    /// call by comingchat
-    public entry fun remove_admin(
-        owner: &signer,
-        admin: address
-    ) acquires RedPackets {
-        let operator_address = signer::address_of(owner);
-        assert!(
-            red_packet_address() == operator_address,
-            error::invalid_argument(EREDPACKET_PERMISSION_DENIED),
-        );
-
-        let red_packets = borrow_global_mut<RedPackets>(operator_address);
-        acl::remove(&mut red_packets.admins, admin);
+        red_packets.admin = admin;
     }
 
     public entry fun set_fee_point(
@@ -241,21 +232,25 @@ module RedPacket::red_packet {
         red_packets.fee_point = new_fee_point;
     }
 
+    public entry fun set_base_prepaid_fee(
+        operator: &signer,
+        new_base_prepaid: u64,
+    ) acquires RedPackets {
+        let operator_address = signer::address_of(operator);
+        check_operator(operator_address, true);
+
+        let red_packets = borrow_global_mut<RedPackets>(operator_address);
+        red_packets.base_prepaid = new_base_prepaid;
+    }
+
     public fun calculate_fee(
         balance: u64,
         fee_point: u8,
     ): (u64, u64) {
         let fee = balance / 10000 * (fee_point as u64);
 
-        // never overflow)
+        // never overflow
         (fee, balance - fee)
-    }
-
-    public fun contains(
-        admin: address
-    ): bool acquires RedPackets {
-        let red_packets = borrow_global<RedPackets>(red_packet_address());
-        acl::contains(&red_packets.admins, admin)
     }
 
     public fun escrow_aptos_coin(
@@ -326,4 +321,23 @@ module RedPacket::red_packet {
         red_packets.fee_point
     }
 
+    public fun admin(): address acquires RedPackets {
+        assert!(
+            exists<RedPackets>(red_packet_address()),
+            error::already_exists(EREDPACKET_NOT_PUBLISHED),
+        );
+
+        let red_packets = borrow_global<RedPackets>(red_packet_address());
+        red_packets.admin
+    }
+
+    public fun base_prepaid(): u64 acquires RedPackets {
+        assert!(
+            exists<RedPackets>(red_packet_address()),
+            error::already_exists(EREDPACKET_NOT_PUBLISHED),
+        );
+
+        let red_packets = borrow_global<RedPackets>(red_packet_address());
+        red_packets.base_prepaid
+    }
 }

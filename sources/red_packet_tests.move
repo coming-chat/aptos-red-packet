@@ -6,8 +6,9 @@ module std::red_packet_tests {
     use aptos_framework::coin;
 
     use RedPacket::red_packet::{
-        Self, initialze, check_operator, create, open, close,
-        add_admin, remove_admin, contains, set_fee_point, fee_point
+        Self, admin, initialze, check_operator, create, open, close,
+        set_admin, base_prepaid, set_base_prepaid_fee, set_fee_point,
+        fee_point, escrow_aptos_coin
     };
 
     #[test_only]
@@ -24,7 +25,6 @@ module std::red_packet_tests {
 
     #[test(operator = @0x123, beneficiary = @0x234)]
     fun initialize_should_work(operator: &signer, beneficiary: address) {
-
         let operator_addr = signer::address_of(operator);
 
         initialze(operator, beneficiary, beneficiary);
@@ -72,7 +72,7 @@ module std::red_packet_tests {
 
         create(&operator, 10, 10000);
 
-        assert!(coin::balance<AptosCoin>(beneficiary_addr) == 250, 15);
+        assert!(coin::balance<AptosCoin>(beneficiary_addr) == 250, 0);
     }
 
     #[test(
@@ -80,7 +80,7 @@ module std::red_packet_tests {
         operator = @0x123,
         beneficiary = @0x234,
         lucky1 = @0x888,
-        lucky2 =@0x999,
+        lucky2 = @0x999,
     )]
     fun open_should_work(
         aptos_framework: signer,
@@ -133,10 +133,10 @@ module std::red_packet_tests {
     #[test(
         aptos_framework = @aptos_framework,
         operator = @0x123,
-        creator  = @0x222,
+        creator = @0x222,
         beneficiary = @0x234,
         lucky1 = @0x888,
-        lucky2 =@0x999,
+        lucky2 = @0x999,
     )]
     fun close_should_work(
         aptos_framework: signer,
@@ -198,7 +198,7 @@ module std::red_packet_tests {
         admin = @0x345,
         new_admin = @0x456,
     )]
-    fun admins_add_remove_should_work(
+    fun set_admin_should_work(
         aptos_framework: signer,
         operator: signer,
         beneficiary: signer,
@@ -206,7 +206,7 @@ module std::red_packet_tests {
         new_admin: signer,
     ) {
         let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(&aptos_framework);
-        setup_aptos(&aptos_framework, &admin, 100);
+        setup_aptos(&aptos_framework, &admin, 10000);
         setup_aptos(&aptos_framework, &beneficiary, 0);
         setup_aptos(&aptos_framework, &new_admin, 100);
 
@@ -221,23 +221,34 @@ module std::red_packet_tests {
         initialze(&operator, beneficiary_addr, admin_addr);
         check_operator(operator_addr, true);
 
-        assert!(contains(admin_addr), 11);
+        assert!(admin() == admin_addr, 0);
+        set_admin(&operator, new_admin_addr);
+        assert!(admin() == new_admin_addr, 1);
 
-        remove_admin(&operator, admin_addr);
-        assert!(!contains(admin_addr), 12);
+        assert!(base_prepaid() == 4, 2);
 
-        add_admin(&operator, new_admin_addr);
-        assert!(!contains(admin_addr), 13);
-        assert!(contains(new_admin_addr), 14);
+        create(&admin, 1, 10000);
 
-        create(&new_admin, 1, 10);
+        // 97.5%
+
+        assert!(escrow_aptos_coin(1) == 10000 - 250, 3);
+
+        // 2.5%
+
+        assert!(coin::balance<AptosCoin>(beneficiary_addr) == 250 - 4, 4);
+        assert!(coin::balance<AptosCoin>(new_admin_addr) == 100 + 4, 5);
 
         let accounts = vector::empty<address>();
-        vector::push_back(&mut accounts, new_admin_addr);
+        vector::push_back(&mut accounts, admin_addr);
         let balances = vector::empty<u64>();
-        vector::push_back(&mut balances, 10);
+        vector::push_back(&mut balances, 10000 - 250 - 100);
 
         open(&new_admin, 1, accounts, balances);
+        assert!(coin::balance<AptosCoin>(admin_addr) == 10000 - 250 - 100, 6);
+        assert!(coin::balance<AptosCoin>(new_admin_addr) == 100 + 4, 7);
+
+        close(&new_admin, 1);
+        assert!(coin::balance<AptosCoin>(beneficiary_addr) == 250 - 4 + 100, 8);
     }
 
     #[test(
@@ -267,11 +278,46 @@ module std::red_packet_tests {
         check_operator(operator_addr, true);
 
         // 2.5%
-        assert!(fee_point() == 250, 16);
+        assert!(fee_point() == 250, 0);
 
         set_fee_point(&operator, 100);
 
         // 1%
-        assert!(fee_point() == 100, 17);
+        assert!(fee_point() == 100, 1);
+    }
+
+    #[test(
+        aptos_framework = @aptos_framework,
+        operator = @0x123,
+        beneficiary = @0x234,
+        admin = @0x345,
+    )]
+    fun set_base_prepaid_fee_should_work(
+        aptos_framework: signer,
+        operator: signer,
+        beneficiary: signer,
+        admin: signer,
+    ) {
+        let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(&aptos_framework);
+        setup_aptos(&aptos_framework, &admin, 100);
+        setup_aptos(&aptos_framework, &beneficiary, 0);
+
+        coin::destroy_mint_cap<AptosCoin>(mint_cap);
+        coin::destroy_burn_cap<AptosCoin>(burn_cap);
+
+        let operator_addr = signer::address_of(&operator);
+        let beneficiary_addr = signer::address_of(&beneficiary);
+        let admin_addr = signer::address_of(&admin);
+
+        initialze(&operator, beneficiary_addr, admin_addr);
+        check_operator(operator_addr, true);
+
+        // 4
+        assert!(base_prepaid() == 4, 0);
+
+        set_base_prepaid_fee(&operator, 40);
+
+        // 40
+        assert!(base_prepaid() == 40, 1);
     }
 }
