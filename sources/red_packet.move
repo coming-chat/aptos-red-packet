@@ -9,6 +9,7 @@ module RedPacket::red_packet {
     use aptos_framework::coin::{Self, Coin};
 
     const MAX_COUNT: u64 = 1000;
+    const MIN_BALANCE: u64 = 10000; // 0.0001 APT(decimals=8)
     const INIT_FEE_POINT: u8 = 250; // 2.5%
     const BASE_PREPAID_FEE: u64 = 1 * 4; // gas_price * gas_used
 
@@ -20,6 +21,7 @@ module RedPacket::red_packet {
     const EREDPACKET_NOT_PUBLISHED: u64 = 6;
     const EREDPACKET_NOT_FOUND: u64 = 7;
     const EREDPACKET_TOO_MANY: u64 = 8;
+    const EREDPACKET_TOO_LITTLE: u64 = 9;
 
     struct RedPacketInfo has store {
         coin: Coin<AptosCoin>,
@@ -88,8 +90,12 @@ module RedPacket::red_packet {
         count: u64,
         total_balance: u64
     ) acquires RedPackets {
-        let operator_address = signer::address_of(operator);
+        assert!(
+            total_balance >= MIN_BALANCE,
+            error::invalid_argument(EREDPACKET_TOO_LITTLE)
+        );
 
+        let operator_address = signer::address_of(operator);
         check_operator(operator_address, false);
 
         assert!(
