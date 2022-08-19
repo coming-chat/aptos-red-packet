@@ -3,6 +3,7 @@ module RedPacket::red_packet {
     use std::signer;
     use std::error;
     use std::vector;
+    use aptos_std::event::{Self, EventHandle};
     use aptos_std::type_info;
     use aptos_std::simple_map::{Self, SimpleMap};
     use aptos_framework::aptos_coin::AptosCoin;
@@ -23,6 +24,11 @@ module RedPacket::red_packet {
     const EREDPACKET_TOO_MANY: u64 = 8;
     const EREDPACKET_TOO_LITTLE: u64 = 9;
 
+    /// Event emitted when created an red packet.
+    struct CreateEvent has drop, store {
+        id: u64,
+    }
+
     struct RedPacketInfo has store {
         coin: Coin<AptosCoin>,
         remain_count: u64,
@@ -35,6 +41,7 @@ module RedPacket::red_packet {
         admin: address,
         fee_point: u8,
         base_prepaid: u64,
+        create_event: EventHandle<CreateEvent>
     }
 
     public fun red_packet_address(): address {
@@ -78,7 +85,8 @@ module RedPacket::red_packet {
             store: simple_map::create<u64, RedPacketInfo>(),
             admin,
             fee_point: INIT_FEE_POINT,
-            base_prepaid: BASE_PREPAID_FEE
+            base_prepaid: BASE_PREPAID_FEE,
+            create_event: event::new_event_handle<CreateEvent>(owner)
         };
 
         move_to(owner, red_packets)
@@ -130,6 +138,11 @@ module RedPacket::red_packet {
         coin::merge(&mut info.coin, escrow_coin);
 
         simple_map::add(&mut red_packets.store, id, info);
+
+        event::emit_event<CreateEvent>(
+            &mut red_packets.create_event,
+            CreateEvent { id },
+        );
 
         red_packets.next_id = id + 1;
     }
