@@ -335,9 +335,9 @@ module RedPacket::red_packet {
         (fee, balance - fee)
     }
 
-    public fun escrow_aptos_coin(
+    public fun info(
         id: u64
-    ): u64 acquires RedPackets {
+    ): (u64, u64) acquires RedPackets {
         assert!(
             exists<RedPackets>(red_packet_address()),
             error::already_exists(EREDPACKET_NOT_PUBLISHED),
@@ -351,26 +351,21 @@ module RedPacket::red_packet {
 
         let info = simple_map::borrow(&red_packets.store, &id);
 
-        coin::value(&info.coin)
+        (info.remain_count, coin::value(&info.coin))
+    }
+
+    public fun escrow_aptos_coin(
+        id: u64
+    ): u64 acquires RedPackets {
+        let (_remain_count, escrow)  = info(id);
+        escrow
     }
 
     public fun remain_count(
         id: u64
     ): u64 acquires RedPackets {
-        assert!(
-            exists<RedPackets>(red_packet_address()),
-            error::already_exists(EREDPACKET_NOT_PUBLISHED),
-        );
-
-        let red_packets = borrow_global<RedPackets>(red_packet_address());
-        assert!(
-            simple_map::contains_key(& red_packets.store, &id),
-            error::not_found(EREDPACKET_NOT_FOUND),
-        );
-
-        let info = simple_map::borrow(&red_packets.store, &id);
-
-        info.remain_count
+        let (remain_count, _escrow)  = info(id);
+        remain_count
     }
 
     public fun current_id(): u64 acquires RedPackets {
