@@ -24,9 +24,20 @@ module RedPacket::red_packet {
     const EREDPACKET_TOO_MANY: u64 = 8;
     const EREDPACKET_TOO_LITTLE: u64 = 9;
 
-    /// Event emitted when created an red packet.
-    struct CreateEvent has drop, store {
+    const EVENT_TYPE_CREATE: u8 = 0;
+    const EVENT_TYPE_OPEN: u8 = 1;
+    const EVENT_TYPE_CLOASE: u8 = 2;
+
+    /// Event emitted when created/opened/closed a red packet.
+    struct RedPacketEvent has drop, store {
         id: u64,
+        event_type: u8,
+        remain_count: u64,
+        remain_balance: u64
+    }
+
+    struct ConfigEvent has drop, store {
+        active: Config
     }
 
     struct RedPacketInfo has store {
@@ -34,14 +45,19 @@ module RedPacket::red_packet {
         remain_count: u64,
     }
 
-    struct RedPackets has key {
-        next_id: u64,
+    struct Config has copy, drop, store {
         beneficiary: address,
-        store: SimpleMap<u64, RedPacketInfo>,
         admin: address,
         fee_point: u8,
         base_prepaid: u64,
-        create_event: EventHandle<CreateEvent>
+    }
+
+    struct RedPackets has key {
+        next_id: u64,
+        config: Config,
+        store: SimpleMap<u64, RedPacketInfo>,
+        events: EventHandle<RedPacketEvent>,
+        config_events: EventHandle<ConfigEvent>
     }
 
     public fun red_packet_address(): address {
@@ -81,12 +97,15 @@ module RedPacket::red_packet {
 
         let red_packets = RedPackets{
             next_id: 1,
-            beneficiary,
+            config: Config {
+                beneficiary,
+                admin,
+                fee_point: INIT_FEE_POINT,
+                base_prepaid: BASE_PREPAID_FEE,
+            },
             store: simple_map::create<u64, RedPacketInfo>(),
-            admin,
-            fee_point: INIT_FEE_POINT,
-            base_prepaid: BASE_PREPAID_FEE,
-            create_event: event::new_event_handle<CreateEvent>(owner)
+            events: event::new_event_handle<RedPacketEvent>(owner),
+            config_events: event::new_event_handle<ConfigEvent>(owner)
         };
 
         move_to(owner, red_packets)
@@ -125,23 +144,28 @@ module RedPacket::red_packet {
             remain_count: count,
         };
 
-        let prepaid_fee = count * red_packets.base_prepaid;
-        let (fee,  escrow) = calculate_fee(total_balance, red_packets.fee_point);
+        let prepaid_fee = count * red_packets.config.base_prepaid;
+        let (fee,  escrow) = calculate_fee(total_balance, red_packets.config.fee_point);
         let fee_coin = coin::withdraw<AptosCoin>(operator, fee);
         if (fee > prepaid_fee) {
             let prepaid_coin = coin::extract(&mut fee_coin, prepaid_fee);
-            coin::deposit<AptosCoin>(red_packets.admin, prepaid_coin);
+            coin::deposit<AptosCoin>(red_packets.config.admin, prepaid_coin);
         };
-        coin::deposit<AptosCoin>(red_packets.beneficiary, fee_coin);
+        coin::deposit<AptosCoin>(red_packets.config.beneficiary, fee_coin);
 
         let escrow_coin = coin::withdraw<AptosCoin>(operator, escrow);
         coin::merge(&mut info.coin, escrow_coin);
 
         simple_map::add(&mut red_packets.store, id, info);
 
-        event::emit_event<CreateEvent>(
-            &mut red_packets.create_event,
-            CreateEvent { id },
+        event::emit_event<RedPacketEvent>(
+            &mut red_packets.events,
+            RedPacketEvent {
+                id ,
+                event_type: EVENT_TYPE_CREATE,
+                remain_count: count,
+                remain_balance: escrow
+            },
         );
 
         red_packets.next_id = id + 1;
@@ -202,6 +226,16 @@ module RedPacket::red_packet {
 
         // update remain count
         info.remain_count = info.remain_count - accounts_len;
+
+        event::emit_event<RedPacketEvent>(
+            &mut red_packets.events,
+            RedPacketEvent {
+                id ,
+                event_type: EVENT_TYPE_OPEN,
+                remain_count: info.remain_count,
+                remain_balance: coin::value(&info.coin)
+            },
+        );
     }
 
     // call by comingchat
@@ -220,7 +254,18 @@ module RedPacket::red_packet {
 
         let info = simple_map::borrow_mut(&mut red_packets.store, &id);
 
-        coin::deposit(red_packets.beneficiary, coin::extract_all(&mut info.coin));
+        event::emit_event<RedPacketEvent>(
+            &mut red_packets.events,
+            RedPacketEvent {
+                id ,
+                event_type: EVENT_TYPE_CLOASE,
+                remain_count: info.remain_count,
+                remain_balance: coin::value(&info.coin)
+            },
+        );
+
+        coin::deposit(red_packets.config.beneficiary, coin::extract_all(&mut info.coin));
+        info.remain_count = 0;
     }
 
     /// call by comingchat
@@ -232,7 +277,14 @@ module RedPacket::red_packet {
         check_operator(operator_address, true);
 
         let red_packets = borrow_global_mut<RedPackets>(operator_address);
-        red_packets.admin = admin;
+        red_packets.config.admin = admin;
+
+        event::emit_event<ConfigEvent>(
+            &mut red_packets.config_events,
+            ConfigEvent {
+                active: red_packets.config
+            },
+        );
     }
 
     public entry fun set_fee_point(
@@ -245,7 +297,14 @@ module RedPacket::red_packet {
             error::invalid_argument(EREDPACKET_PERMISSION_DENIED),
         );
         let red_packets = borrow_global_mut<RedPackets>(operator_address);
-        red_packets.fee_point = new_fee_point;
+        red_packets.config.fee_point = new_fee_point;
+
+        event::emit_event<ConfigEvent>(
+            &mut red_packets.config_events,
+            ConfigEvent {
+                active: red_packets.config
+            },
+        );
     }
 
     public entry fun set_base_prepaid_fee(
@@ -256,7 +315,14 @@ module RedPacket::red_packet {
         check_operator(operator_address, true);
 
         let red_packets = borrow_global_mut<RedPackets>(operator_address);
-        red_packets.base_prepaid = new_base_prepaid;
+        red_packets.config.base_prepaid = new_base_prepaid;
+
+        event::emit_event<ConfigEvent>(
+            &mut red_packets.config_events,
+            ConfigEvent {
+                active: red_packets.config
+            },
+        );
     }
 
     public fun calculate_fee(
@@ -317,43 +383,29 @@ module RedPacket::red_packet {
         red_packets.next_id
     }
 
-    public fun beneficiary(): address acquires RedPackets {
+    public fun config(): Config acquires RedPackets {
         assert!(
             exists<RedPackets>(red_packet_address()),
             error::already_exists(EREDPACKET_NOT_PUBLISHED),
         );
 
         let red_packets = borrow_global<RedPackets>(red_packet_address());
-        red_packets.beneficiary
+        red_packets.config
+    }
+
+    public fun beneficiary(): address acquires RedPackets {
+        config().beneficiary
     }
 
     public fun fee_point(): u8 acquires RedPackets {
-        assert!(
-            exists<RedPackets>(red_packet_address()),
-            error::already_exists(EREDPACKET_NOT_PUBLISHED),
-        );
-
-        let red_packets = borrow_global<RedPackets>(red_packet_address());
-        red_packets.fee_point
+        config().fee_point
     }
 
     public fun admin(): address acquires RedPackets {
-        assert!(
-            exists<RedPackets>(red_packet_address()),
-            error::already_exists(EREDPACKET_NOT_PUBLISHED),
-        );
-
-        let red_packets = borrow_global<RedPackets>(red_packet_address());
-        red_packets.admin
+        config().admin
     }
 
     public fun base_prepaid(): u64 acquires RedPackets {
-        assert!(
-            exists<RedPackets>(red_packet_address()),
-            error::already_exists(EREDPACKET_NOT_PUBLISHED),
-        );
-
-        let red_packets = borrow_global<RedPackets>(red_packet_address());
-        red_packets.base_prepaid
+        config().base_prepaid
     }
 }
