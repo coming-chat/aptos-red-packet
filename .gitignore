@@ -1,4 +1,4 @@
 /build/
 .idea
 /.aptos/
-/aptos-core/
+aptos-core
