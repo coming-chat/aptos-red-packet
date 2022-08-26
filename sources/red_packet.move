@@ -6,6 +6,7 @@ module RedPacket::red_packet {
     use aptos_std::event::{Self, EventHandle};
     use aptos_std::type_info;
     use aptos_std::simple_map::{Self, SimpleMap};
+    use aptos_framework::account;
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::coin::{Self, Coin};
 
@@ -104,8 +105,8 @@ module RedPacket::red_packet {
                 base_prepaid: BASE_PREPAID_FEE,
             },
             store: simple_map::create<u64, RedPacketInfo>(),
-            events: event::new_event_handle<RedPacketEvent>(owner),
-            config_events: event::new_event_handle<ConfigEvent>(owner)
+            events: account::new_event_handle<RedPacketEvent>(owner),
+            config_events: account::new_event_handle<ConfigEvent>(owner)
         };
 
         move_to(owner, red_packets)
