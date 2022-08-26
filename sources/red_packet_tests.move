@@ -37,13 +37,9 @@ module std::red_packet_tests {
         operator: &signer,
         beneficiary: address
     ) {
-        let operator_addr = signer::address_of(operator);
-
-        let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(&aptos_framework);
         setup_aptos(&aptos_framework, operator, 0);
-        coin::destroy_mint_cap<AptosCoin>(mint_cap);
-        coin::destroy_burn_cap<AptosCoin>(burn_cap);
 
+        let operator_addr = signer::address_of(operator);
         initialze(operator, beneficiary, beneficiary);
 
         red_packet::check_operator(operator_addr, true);
