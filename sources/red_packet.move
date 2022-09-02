@@ -41,8 +41,11 @@ module RedPacket::red_packet {
         active: Config
     }
 
-    struct RedPacketInfo has store {
-        coin: Coin<AptosCoin>,
+    /// initialize when create
+    /// change when open
+    /// drop when close
+    struct RedPacketInfo has drop, store {
+        remain_coin: u64,
         remain_count: u64,
     }
 
@@ -56,6 +59,8 @@ module RedPacket::red_packet {
     struct RedPackets has key {
         next_id: u64,
         config: Config,
+        // escrow global aptos coin
+        coin: Coin<AptosCoin>,
         store: SimpleMap<u64, RedPacketInfo>,
         events: EventHandle<RedPacketEvent>,
         config_events: EventHandle<ConfigEvent>
@@ -104,6 +109,7 @@ module RedPacket::red_packet {
                 fee_point: INIT_FEE_POINT,
                 base_prepaid: BASE_PREPAID_FEE,
             },
+            coin: coin::zero<AptosCoin>(),
             store: simple_map::create<u64, RedPacketInfo>(),
             events: account::new_event_handle<RedPacketEvent>(owner),
             config_events: account::new_event_handle<ConfigEvent>(owner)
@@ -141,7 +147,7 @@ module RedPacket::red_packet {
         let id = red_packets.next_id;
 
         let info  = RedPacketInfo {
-            coin: coin::zero<AptosCoin>(),
+            remain_coin: 0,
             remain_count: count,
         };
 
@@ -155,7 +161,8 @@ module RedPacket::red_packet {
         coin::deposit<AptosCoin>(red_packets.config.beneficiary, fee_coin);
 
         let escrow_coin = coin::withdraw<AptosCoin>(operator, escrow);
-        coin::merge(&mut info.coin, escrow_coin);
+        info.remain_coin = coin::value(&escrow_coin);
+        coin::merge(&mut red_packets.coin, escrow_coin);
 
         simple_map::add(&mut red_packets.store, id, info);
 
@@ -208,7 +215,7 @@ module RedPacket::red_packet {
             i = i + 1;
         };
         assert!(
-            total <= coin::value(&info.coin),
+            total <= info.remain_coin && total <= coin::value(&red_packets.coin),
             error::invalid_argument(EREDPACKET_INSUFFICIENT_BALANCES),
         );
         assert!(
@@ -220,13 +227,14 @@ module RedPacket::red_packet {
         while (i < accounts_len) {
             let account = vector::borrow(&lucky_accounts, i);
             let balance = vector::borrow(&balances, i);
-            coin::deposit(*account, coin::extract(&mut info.coin, *balance));
+            coin::deposit(*account, coin::extract(&mut red_packets.coin, *balance));
 
             i = i + 1;
         };
 
         // update remain count
         info.remain_count = info.remain_count - accounts_len;
+        info.remain_coin = coin::value(&red_packets.coin);
 
         event::emit_event<RedPacketEvent>(
             &mut red_packets.events,
@@ -234,7 +242,7 @@ module RedPacket::red_packet {
                 id ,
                 event_type: EVENT_TYPE_OPEN,
                 remain_count: info.remain_count,
-                remain_balance: coin::value(&info.coin)
+                remain_balance: coin::value(&red_packets.coin)
             },
         );
     }
@@ -253,7 +261,8 @@ module RedPacket::red_packet {
             error::not_found(EREDPACKET_NOT_FOUND),
         );
 
-        let info = simple_map::borrow_mut(&mut red_packets.store, &id);
+        // drop this red packet
+        let (_, info) = simple_map::remove(&mut red_packets.store, &id);
 
         event::emit_event<RedPacketEvent>(
             &mut red_packets.events,
@@ -261,12 +270,16 @@ module RedPacket::red_packet {
                 id ,
                 event_type: EVENT_TYPE_CLOASE,
                 remain_count: info.remain_count,
-                remain_balance: coin::value(&info.coin)
+                remain_balance: info.remain_coin
             },
         );
 
-        coin::deposit(red_packets.config.beneficiary, coin::extract_all(&mut info.coin));
-        info.remain_count = 0;
+        if (info.remain_coin > 0) {
+            coin::deposit(
+                red_packets.config.beneficiary,
+                coin::extract(&mut red_packets.coin, info.remain_coin)
+            );
+        }
     }
 
     /// call by comingchat
@@ -352,7 +365,7 @@ module RedPacket::red_packet {
 
         let info = simple_map::borrow(&red_packets.store, &id);
 
-        (info.remain_count, coin::value(&info.coin))
+        (info.remain_count, info.remain_coin)
     }
 
     public fun escrow_aptos_coin(
