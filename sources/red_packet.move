@@ -5,7 +5,7 @@ module RedPacket::red_packet {
     use std::vector;
     use aptos_std::event::{Self, EventHandle};
     use aptos_std::type_info;
-    use aptos_std::simple_map::{Self, SimpleMap};
+    use aptos_std::bucket_table;
     use aptos_framework::account;
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::coin::{Self, Coin};
@@ -61,7 +61,7 @@ module RedPacket::red_packet {
         config: Config,
         // escrow global aptos coin
         coin: Coin<AptosCoin>,
-        store: SimpleMap<u64, RedPacketInfo>,
+        store: bucket_table::BucketTable<u64, RedPacketInfo>,
         events: EventHandle<RedPacketEvent>,
         config_events: EventHandle<ConfigEvent>
     }
@@ -110,7 +110,7 @@ module RedPacket::red_packet {
                 base_prepaid: BASE_PREPAID_FEE,
             },
             coin: coin::zero<AptosCoin>(),
-            store: simple_map::create<u64, RedPacketInfo>(),
+            store: bucket_table::new<u64, RedPacketInfo>(1),
             events: account::new_event_handle<RedPacketEvent>(owner),
             config_events: account::new_event_handle<ConfigEvent>(owner)
         };
@@ -164,7 +164,7 @@ module RedPacket::red_packet {
         info.remain_coin = coin::value(&escrow_coin);
         coin::merge(&mut red_packets.coin, escrow_coin);
 
-        simple_map::add(&mut red_packets.store, id, info);
+        bucket_table::add(&mut red_packets.store, id, info);
 
         event::emit_event<RedPacketEvent>(
             &mut red_packets.events,
@@ -202,11 +202,11 @@ module RedPacket::red_packet {
 
         let red_packets = borrow_global_mut<RedPackets>(red_packet_address());
         assert!(
-            simple_map::contains_key(& red_packets.store, &id),
+            bucket_table::contains(& red_packets.store, &id),
             error::not_found(EREDPACKET_NOT_FOUND),
         );
 
-        let info = simple_map::borrow_mut(&mut red_packets.store, &id);
+        let info = bucket_table::borrow_mut(&mut red_packets.store, id);
 
         let total = 0u64;
         let i = 0u64;
@@ -257,12 +257,12 @@ module RedPacket::red_packet {
 
         let red_packets = borrow_global_mut<RedPackets>(red_packet_address());
         assert!(
-            simple_map::contains_key(& red_packets.store, &id),
+            bucket_table::contains(& red_packets.store, &id),
             error::not_found(EREDPACKET_NOT_FOUND),
         );
 
         // drop this red packet
-        let (_, info) = simple_map::remove(&mut red_packets.store, &id);
+        let info = bucket_table::remove(&mut red_packets.store, &id);
 
         event::emit_event<RedPacketEvent>(
             &mut red_packets.events,
@@ -357,13 +357,13 @@ module RedPacket::red_packet {
             error::already_exists(EREDPACKET_NOT_PUBLISHED),
         );
 
-        let red_packets = borrow_global<RedPackets>(red_packet_address());
+        let red_packets = borrow_global_mut<RedPackets>(red_packet_address());
         assert!(
-            simple_map::contains_key(& red_packets.store, &id),
+            bucket_table::contains(& red_packets.store, &id),
             error::not_found(EREDPACKET_NOT_FOUND),
         );
 
-        let info = simple_map::borrow(&red_packets.store, &id);
+        let info = bucket_table::borrow(&mut red_packets.store, id);
 
         (info.remain_count, info.remain_coin)
     }
