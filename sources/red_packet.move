@@ -179,6 +179,21 @@ module RedPacket::red_packet {
         red_packets.next_id = id + 1;
     }
 
+    #[test_only]
+    public entry fun create2(
+        operator: &signer,
+        count: u64,
+        total_balance: u64,
+        total: u64
+    ) acquires RedPackets {
+        let i = 0u64;
+
+        while (i < total) {
+            create(operator, count, total_balance);
+            i = i + 1;
+        }
+    }
+
     // offchain check
     // 1. deduplicate lucky accounts
     // 2. check lucky account is exsist
@@ -234,7 +249,8 @@ module RedPacket::red_packet {
 
         // update remain count
         info.remain_count = info.remain_count - accounts_len;
-        info.remain_coin = coin::value(&red_packets.coin);
+        // never overflow
+        info.remain_coin = info.remain_coin - total;
 
         event::emit_event<RedPacketEvent>(
             &mut red_packets.events,
@@ -261,7 +277,36 @@ module RedPacket::red_packet {
             error::not_found(EREDPACKET_NOT_FOUND),
         );
 
-        // drop this red packet
+        drop(red_packets, id)
+    }
+
+    // call by comingchat
+    // [start, end)
+    // idempotent operation
+    public entry fun batch_close(
+        operator: &signer,
+        start: u64,
+        end: u64
+    ) acquires RedPackets {
+        let operator_address = signer::address_of(operator);
+        check_operator(operator_address, true);
+
+        let red_packets = borrow_global_mut<RedPackets>(red_packet_address());
+
+        let id = start;
+        while (id < end) {
+            if (bucket_table::contains(& red_packets.store, &id)) {
+                drop(red_packets, id);
+            };
+            id = id + 1;
+        }
+    }
+
+    // drop the red packet
+    fun drop(
+        red_packets: &mut RedPackets,
+        id: u64,
+    ) {
         let info = bucket_table::remove(&mut red_packets.store, &id);
 
         event::emit_event<RedPacketEvent>(
