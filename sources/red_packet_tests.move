@@ -7,7 +7,7 @@ module std::red_packet_tests {
     use aptos_framework::coin;
 
     use RedPacket::red_packet::{
-        Self, initialze, create, open, close, set_admin, set_base_prepaid_fee, set_fee_point,
+        Self, initialize, create, open, close, set_admin, set_base_prepaid_fee, set_fee_point,
     };
 
     #[test_only]
@@ -40,7 +40,7 @@ module std::red_packet_tests {
         setup_aptos(&aptos_framework, operator, 0);
 
         let operator_addr = signer::address_of(operator);
-        initialze(operator, beneficiary, beneficiary);
+        initialize(operator, beneficiary, beneficiary);
 
         red_packet::check_operator(operator_addr, true);
     }
@@ -59,11 +59,11 @@ module std::red_packet_tests {
         setup_aptos(&aptos_framework, operator, 0);
 
         let operator_addr = signer::address_of(operator);
-        initialze(operator, beneficiary, beneficiary);
+        initialize(operator, beneficiary, beneficiary);
 
         red_packet::check_operator(operator_addr, true);
 
-        initialze(operator, beneficiary, beneficiary);
+        initialize(operator, beneficiary, beneficiary);
     }
 
     #[test(
@@ -79,7 +79,7 @@ module std::red_packet_tests {
     ) {
         setup_aptos(&aptos_framework, lucky, 0);
 
-        initialze(lucky, beneficiary, beneficiary);
+        initialize(lucky, beneficiary, beneficiary);
     }
 
     #[test(
@@ -97,7 +97,7 @@ module std::red_packet_tests {
 
         let beneficiary_addr = signer::address_of(&beneficiary);
 
-        initialze(&operator, beneficiary_addr, beneficiary_addr);
+        initialize(&operator, beneficiary_addr, beneficiary_addr);
 
         create(&operator, 10, 10000);
 
@@ -126,7 +126,7 @@ module std::red_packet_tests {
         let operator_addr = signer::address_of(&operator);
         let beneficiary_addr = signer::address_of(&beneficiary);
 
-        initialze(&operator, beneficiary_addr, beneficiary_addr);
+        initialize(&operator, beneficiary_addr, beneficiary_addr);
 
         assert!(coin::balance<AptosCoin>(operator_addr) == 100000, 0);
 
@@ -186,7 +186,7 @@ module std::red_packet_tests {
         let creator_addr = signer::address_of(&creator);
         let beneficiary_addr = signer::address_of(&beneficiary);
 
-        initialze(&operator, beneficiary_addr, beneficiary_addr);
+        initialize(&operator, beneficiary_addr, beneficiary_addr);
 
         assert!(coin::balance<AptosCoin>(creator_addr) == 100000, 0);
 
@@ -248,7 +248,7 @@ module std::red_packet_tests {
         let admin_addr = signer::address_of(&admin);
         let new_admin_addr = signer::address_of(&new_admin);
 
-        initialze(&operator, beneficiary_addr, admin_addr);
+        initialize(&operator, beneficiary_addr, admin_addr);
         red_packet::check_operator(operator_addr, true);
 
         assert!(red_packet::admin() == admin_addr, 0);
@@ -301,7 +301,7 @@ module std::red_packet_tests {
         let beneficiary_addr = signer::address_of(&beneficiary);
         let admin_addr = signer::address_of(&admin);
 
-        initialze(&operator, beneficiary_addr, admin_addr);
+        initialize(&operator, beneficiary_addr, admin_addr);
         red_packet::check_operator(operator_addr, true);
 
         // 2.5%
@@ -333,7 +333,7 @@ module std::red_packet_tests {
         let beneficiary_addr = signer::address_of(&beneficiary);
         let admin_addr = signer::address_of(&admin);
 
-        initialze(&operator, beneficiary_addr, admin_addr);
+        initialize(&operator, beneficiary_addr, admin_addr);
         red_packet::check_operator(operator_addr, true);
 
         // 4

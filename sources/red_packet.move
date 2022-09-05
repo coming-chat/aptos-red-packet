@@ -85,7 +85,7 @@ module RedPacket::red_packet {
     }
 
     // call by comingchat
-    public entry fun initialze(
+    public entry fun initialize(
         owner: &signer,
         beneficiary: address,
         admin: address,
