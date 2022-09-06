@@ -60,3 +60,10 @@ aptos move test
 
 aptos move publish --named-addresses RedPacket=<your address>
 ```
+
+### bench data
+```txt
+create(after 150,000 items): 75~150 gas
+open(max=1000 items): 25443 gas
+batch_close(10000 items): 206001 gas
+```
