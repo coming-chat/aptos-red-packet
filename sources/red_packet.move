@@ -3,11 +3,12 @@ module RedPacket::red_packet {
     use std::signer;
     use std::error;
     use std::vector;
+    use std::string;
     use aptos_std::event::{Self, EventHandle};
     use aptos_std::type_info;
     use aptos_framework::account;
-    use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::coin::{Self, Coin};
+    use aptos_framework::aptos_coin::AptosCoin;
     use RedPacket::bucket_table;
 
     const MAX_COUNT: u64 = 1000;
@@ -24,6 +25,7 @@ module RedPacket::red_packet {
     const EREDPACKET_NOT_FOUND: u64 = 7;
     const EREDPACKET_TOO_MANY: u64 = 8;
     const EREDPACKET_TOO_LITTLE: u64 = 9;
+    const EREDPACKET_ALREADY_REGISTER: u64 = 10;
 
     const EVENT_TYPE_CREATE: u8 = 0;
     const EVENT_TYPE_OPEN: u8 = 1;
@@ -59,15 +61,23 @@ module RedPacket::red_packet {
     struct RedPackets has key {
         next_id: u64,
         config: Config,
-        // escrow global aptos coin
-        coin: Coin<AptosCoin>,
         store: bucket_table::BucketTable<u64, RedPacketInfo>,
         events: EventHandle<RedPacketEvent>,
         config_events: EventHandle<ConfigEvent>
     }
 
+    struct Escrow<phantom CoinType> has key {
+        coin: Coin<CoinType>,
+    }
+
     public fun red_packet_address(): address {
         type_info::account_address(&type_info::type_of<RedPackets>())
+    }
+
+    /// A helper function that returns the address of CoinType.
+    fun coin_address<CoinType>(): address {
+        let type_info = type_info::type_of<CoinType>();
+        type_info::account_address(&type_info)
     }
 
     public fun check_operator(
@@ -80,7 +90,7 @@ module RedPacket::red_packet {
         );
         assert!(
             !require_admin || admin() == operator_address || red_packet_address() == operator_address,
-            error::invalid_argument(EREDPACKET_PERMISSION_DENIED),
+            error::permission_denied(EREDPACKET_PERMISSION_DENIED),
         );
     }
 
@@ -93,7 +103,7 @@ module RedPacket::red_packet {
         let owner_addr = signer::address_of(owner);
         assert!(
             red_packet_address() == owner_addr,
-            error::invalid_argument(EREDPACKET_PERMISSION_DENIED),
+            error::permission_denied(EREDPACKET_PERMISSION_DENIED),
         );
 
         assert!(
@@ -109,7 +119,6 @@ module RedPacket::red_packet {
                 fee_point: INIT_FEE_POINT,
                 base_prepaid: BASE_PREPAID_FEE,
             },
-            coin: coin::zero<AptosCoin>(),
             store: bucket_table::new<u64, RedPacketInfo>(1),
             events: account::new_event_handle<RedPacketEvent>(owner),
             config_events: account::new_event_handle<ConfigEvent>(owner)
@@ -118,12 +127,31 @@ module RedPacket::red_packet {
         move_to(owner, red_packets)
     }
 
+    public entry fun register_coin<CoinType>(
+        operator: &signer,
+    ) acquires RedPackets {
+        let operator_address = signer::address_of(operator);
+        check_operator(operator_address, false);
+
+        assert!(
+            !exists<Escrow<CoinType>>(red_packet_address()),
+            error::already_exists(EREDPACKET_ALREADY_PUBLISHED),
+        );
+
+        move_to(
+            operator,
+            Escrow<CoinType> {
+                coin: coin::zero<CoinType>()
+            }
+        );
+    }
+
     // call by anyone in comingchat
-    public entry fun create(
+    public entry fun create<CoinType>(
         operator: &signer,
         count: u64,
         total_balance: u64
-    ) acquires RedPackets {
+    ) acquires RedPackets, Escrow {
         assert!(
             total_balance >= MIN_BALANCE,
             error::invalid_argument(EREDPACKET_TOO_LITTLE)
@@ -133,7 +161,7 @@ module RedPacket::red_packet {
         check_operator(operator_address, false);
 
         assert!(
-            coin::balance<AptosCoin>(operator_address) >= total_balance,
+            coin::balance<CoinType>(operator_address) >= total_balance,
             error::invalid_argument(ENOT_ENOUGH_COIN)
         );
 
@@ -153,16 +181,23 @@ module RedPacket::red_packet {
 
         let prepaid_fee = count * red_packets.config.base_prepaid;
         let (fee,  escrow) = calculate_fee(total_balance, red_packets.config.fee_point);
-        let fee_coin = coin::withdraw<AptosCoin>(operator, fee);
-        if (fee > prepaid_fee) {
-            let prepaid_coin = coin::extract(&mut fee_coin, prepaid_fee);
+        let fee_coin = coin::withdraw<CoinType>(operator, fee);
+        if (coin_address<CoinType>() == @aptos_std && coin::symbol<CoinType>() == string::utf8(b"APT")) {
+            if (fee > prepaid_fee) {
+                let prepaid_coin = coin::extract(&mut fee_coin, prepaid_fee);
+                coin::deposit<CoinType>(red_packets.config.admin, prepaid_coin);
+            };
+        } else {
+            let prepaid_coin = coin::withdraw<AptosCoin>(operator, prepaid_fee);
             coin::deposit<AptosCoin>(red_packets.config.admin, prepaid_coin);
         };
-        coin::deposit<AptosCoin>(red_packets.config.beneficiary, fee_coin);
 
-        let escrow_coin = coin::withdraw<AptosCoin>(operator, escrow);
+        coin::deposit<CoinType>(red_packets.config.beneficiary, fee_coin);
+
+        let escrow_coin = coin::withdraw<CoinType>(operator, escrow);
         info.remain_coin = coin::value(&escrow_coin);
-        coin::merge(&mut red_packets.coin, escrow_coin);
+
+        merge_coin<CoinType>(escrow_coin);
 
         bucket_table::add(&mut red_packets.store, id, info);
 
@@ -179,17 +214,24 @@ module RedPacket::red_packet {
         red_packets.next_id = id + 1;
     }
 
+    fun merge_coin<CoinType>(
+        coin: Coin<CoinType>
+    ) acquires Escrow {
+        let escrow = borrow_global_mut<Escrow<CoinType>>(red_packet_address());
+        coin::merge(&mut escrow.coin, coin);
+    }
+
     #[test_only]
-    public entry fun create2(
+    public entry fun create2<CoinType>(
         operator: &signer,
         count: u64,
         total_balance: u64,
         total: u64
-    ) acquires RedPackets {
+    ) acquires RedPackets, Escrow {
         let i = 0u64;
 
         while (i < total) {
-            create(operator, count, total_balance);
+            create<CoinType>(operator, count, total_balance);
             i = i + 1;
         }
     }
@@ -199,12 +241,12 @@ module RedPacket::red_packet {
     // 2. check lucky account is exsist
     // 3. check total balance
     // call by comingchat
-    public entry fun open(
+    public entry fun open<CoinType>(
         operator: &signer,
         id: u64,
         lucky_accounts: vector<address>,
         balances: vector<u64>
-    ) acquires RedPackets {
+    ) acquires RedPackets, Escrow {
         let operator_address = signer::address_of(operator);
         check_operator(operator_address, true);
 
@@ -223,6 +265,8 @@ module RedPacket::red_packet {
 
         let info = bucket_table::borrow_mut(&mut red_packets.store, id);
 
+        let escrow_coin = borrow_global_mut<Escrow<CoinType>>(red_packet_address());
+
         let total = 0u64;
         let i = 0u64;
         while (i < balances_len) {
@@ -230,7 +274,7 @@ module RedPacket::red_packet {
             i = i + 1;
         };
         assert!(
-            total <= info.remain_coin && total <= coin::value(&red_packets.coin),
+            total <= info.remain_coin && total <= coin::value(&escrow_coin.coin),
             error::invalid_argument(EREDPACKET_INSUFFICIENT_BALANCES),
         );
         assert!(
@@ -242,7 +286,7 @@ module RedPacket::red_packet {
         while (i < accounts_len) {
             let account = vector::borrow(&lucky_accounts, i);
             let balance = vector::borrow(&balances, i);
-            coin::deposit(*account, coin::extract(&mut red_packets.coin, *balance));
+            coin::deposit(*account, coin::extract(&mut escrow_coin.coin, *balance));
 
             i = i + 1;
         };
@@ -258,16 +302,16 @@ module RedPacket::red_packet {
                 id ,
                 event_type: EVENT_TYPE_OPEN,
                 remain_count: info.remain_count,
-                remain_balance: coin::value(&red_packets.coin)
+                remain_balance: coin::value(&escrow_coin.coin)
             },
         );
     }
 
     // call by comingchat
-    public entry fun close(
+    public entry fun close<CoinType>(
         operator: &signer,
         id: u64
-    ) acquires RedPackets {
+    ) acquires RedPackets, Escrow {
         let operator_address = signer::address_of(operator);
         check_operator(operator_address, true);
 
@@ -277,17 +321,17 @@ module RedPacket::red_packet {
             error::not_found(EREDPACKET_NOT_FOUND),
         );
 
-        drop(red_packets, id)
+        drop<CoinType>(red_packets, id)
     }
 
     // call by comingchat
     // [start, end)
     // idempotent operation
-    public entry fun batch_close(
+    public entry fun batch_close<CoinType>(
         operator: &signer,
         start: u64,
         end: u64
-    ) acquires RedPackets {
+    ) acquires RedPackets, Escrow {
         let operator_address = signer::address_of(operator);
         check_operator(operator_address, true);
 
@@ -296,18 +340,19 @@ module RedPacket::red_packet {
         let id = start;
         while (id < end) {
             if (bucket_table::contains(& red_packets.store, &id)) {
-                drop(red_packets, id);
+                drop<CoinType>(red_packets, id);
             };
             id = id + 1;
         }
     }
 
     // drop the red packet
-    fun drop(
+    fun drop<CoinType>(
         red_packets: &mut RedPackets,
         id: u64,
-    ) {
+    ) acquires Escrow {
         let info = bucket_table::remove(&mut red_packets.store, &id);
+        let escrow_coin = borrow_global_mut<Escrow<CoinType>>(red_packet_address());
 
         event::emit_event<RedPacketEvent>(
             &mut red_packets.events,
@@ -322,7 +367,7 @@ module RedPacket::red_packet {
         if (info.remain_coin > 0) {
             coin::deposit(
                 red_packets.config.beneficiary,
-                coin::extract(&mut red_packets.coin, info.remain_coin)
+                coin::extract(&mut escrow_coin.coin, info.remain_coin)
             );
         }
     }
