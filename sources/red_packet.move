@@ -5,10 +5,10 @@ module RedPacket::red_packet {
     use std::vector;
     use aptos_std::event::{Self, EventHandle};
     use aptos_std::type_info;
-    use aptos_std::bucket_table;
     use aptos_framework::account;
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::coin::{Self, Coin};
+    use RedPacket::bucket_table;
 
     const MAX_COUNT: u64 = 1000;
     const MIN_BALANCE: u64 = 10000; // 0.0001 APT(decimals=8)
