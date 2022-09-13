@@ -31,6 +31,9 @@ module RedPacket::red_packet {
     const EVENT_TYPE_OPEN: u8 = 1;
     const EVENT_TYPE_CLOASE: u8 = 2;
 
+    #[test_only]
+    struct TestCoin {}
+
     /// Event emitted when created/opened/closed a red packet.
     struct RedPacketEvent has drop, store {
         id: u64,
@@ -75,7 +78,7 @@ module RedPacket::red_packet {
     }
 
     /// A helper function that returns the address of CoinType.
-    fun coin_address<CoinType>(): address {
+    public fun coin_address<CoinType>(): address {
         let type_info = type_info::type_of<CoinType>();
         type_info::account_address(&type_info)
     }
@@ -458,7 +461,7 @@ module RedPacket::red_packet {
         (info.remain_count, info.remain_coin)
     }
 
-    public fun escrow_aptos_coin(
+    public fun escrow_coins(
         id: u64
     ): u64 acquires RedPackets {
         let (_remain_count, escrow)  = info(id);
