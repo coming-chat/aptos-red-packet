@@ -10,6 +10,17 @@ The code contract will be deployed to the Aptos/Sui smart contract platform
 - AptosFramework: `main @ 16bec80146da2f3fd28b948cf25f807e09e92e23`
 - AptosStdlib: `main @ 16bec80146da2f3fd28b948cf25f807e09e92e23`
 
+### Best practice
+`one red packet contract, one coin type`
+
+eg. `Aptos Coin` in one contract, `XBTC` in another. 
+They can all call `batch_close`
+
+### Roles and Calls
+- `owner`: `publish`, `initialize`, `set_admin`, `set_fee_point`
+- `admin`: `open`, `close`, `batch_close`, `set_base_prepaid_fee`
+- `user`: `create`
+
 ### Install
 ```bash
 # aptos-cli
@@ -60,11 +71,6 @@ aptos move test
 
 aptos move publish --named-addresses RedPacket=<your address>
 ```
-
-### Roles and Calls
-- `owner`: `publish`, `initialize`, `register_coin`, `set_admin`, `set_fee_point`
-- `admin`: `open`, `close`, `batch_close`, `set_base_prepaid_fee`
-- `user`: `create`
 
 ### bench data
 ```txt

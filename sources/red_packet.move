@@ -96,7 +96,7 @@ module RedPacket::red_packet {
 
     /// call by comingchat owner
     /// set beneficiary and admin
-    public entry fun initialize(
+    public entry fun initialize<CoinType>(
         owner: &signer,
         beneficiary: address,
         admin: address,
@@ -125,24 +125,7 @@ module RedPacket::red_packet {
             config_events: account::new_event_handle<ConfigEvent>(owner)
         };
 
-        move_to(owner, red_packets)
-    }
-
-    /// call by comingchat owner
-    /// register coin type
-    public entry fun register_coin<CoinType>(
-        owner: &signer,
-    ) {
-        let owner_address = signer::address_of(owner);
-        assert!(
-            red_packet_address() == owner_address,
-            error::permission_denied(EREDPACKET_PERMISSION_DENIED)
-        );
-
-        assert!(
-            !exists<Escrow<CoinType>>(red_packet_address()),
-            error::already_exists(EREDPACKET_ALREADY_PUBLISHED),
-        );
+        move_to(owner, red_packets);
 
         move_to(
             owner,

@@ -9,7 +9,7 @@ module std::red_packet_tests {
 
     use RedPacket::red_packet::{
         Self, initialize, create, open, close, set_admin, set_base_prepaid_fee,
-        set_fee_point, batch_close, register_coin, TestCoin
+        set_fee_point, batch_close, TestCoin
     };
 
     #[test_only]
@@ -76,7 +76,7 @@ module std::red_packet_tests {
         setup_aptos(&aptos_framework, operator, 0);
 
         let operator_addr = signer::address_of(operator);
-        initialize(operator, beneficiary, beneficiary);
+        initialize<AptosCoin>(operator, beneficiary, beneficiary);
 
         red_packet::check_operator(operator_addr, true);
     }
@@ -95,11 +95,11 @@ module std::red_packet_tests {
         setup_aptos(&aptos_framework, operator, 0);
 
         let operator_addr = signer::address_of(operator);
-        initialize(operator, beneficiary, beneficiary);
+        initialize<AptosCoin>(operator, beneficiary, beneficiary);
 
         red_packet::check_operator(operator_addr, true);
 
-        initialize(operator, beneficiary, beneficiary);
+        initialize<AptosCoin>(operator, beneficiary, beneficiary);
     }
 
     #[test(
@@ -115,7 +115,7 @@ module std::red_packet_tests {
     ) {
         setup_aptos(&aptos_framework, lucky, 0);
 
-        initialize(lucky, beneficiary, beneficiary);
+        initialize<AptosCoin>(lucky, beneficiary, beneficiary);
     }
 
     #[test(
@@ -133,9 +133,7 @@ module std::red_packet_tests {
 
         let beneficiary_addr = signer::address_of(&beneficiary);
 
-        initialize(&operator, beneficiary_addr, beneficiary_addr);
-
-        register_coin<AptosCoin>(&operator);
+        initialize<AptosCoin>(&operator, beneficiary_addr, beneficiary_addr);
 
         create<AptosCoin>(&operator, 10, 10000);
 
@@ -164,9 +162,7 @@ module std::red_packet_tests {
         let beneficiary_addr = signer::address_of(&beneficiary);
         let operator_addr = signer::address_of(&operator);
 
-        initialize(&operator, beneficiary_addr, beneficiary_addr);
-
-        register_coin<TestCoin>(&operator);
+        initialize<TestCoin>(&operator, beneficiary_addr, beneficiary_addr);
 
         assert!(coin::balance<TestCoin>(operator_addr) == 10000, 0);
         assert!(coin::balance<AptosCoin>(operator_addr) == 1000, 1);
@@ -179,27 +175,6 @@ module std::red_packet_tests {
 
         assert!(coin::balance<TestCoin>(beneficiary_addr) == 250, 3);
         assert!(coin::balance<AptosCoin>(operator_addr) == 960, 4);
-    }
-
-    #[test(
-        aptos_framework = @aptos_framework,
-        operator = @0x123,
-        beneficiary = @0x234
-    )]
-    #[expected_failure]
-    fun create_should_fail_without_register(
-        aptos_framework: signer,
-        operator: signer,
-        beneficiary: signer
-    ) {
-        setup_aptos(&aptos_framework, &operator, 10000);
-        setup_aptos(&aptos_framework, &beneficiary, 0);
-
-        let beneficiary_addr = signer::address_of(&beneficiary);
-
-        initialize(&operator, beneficiary_addr, beneficiary_addr);
-
-        create<AptosCoin>(&operator, 10, 10000);
     }
 
     #[test(
@@ -224,9 +199,7 @@ module std::red_packet_tests {
         let operator_addr = signer::address_of(&operator);
         let beneficiary_addr = signer::address_of(&beneficiary);
 
-        initialize(&operator, beneficiary_addr, beneficiary_addr);
-
-        register_coin<AptosCoin>(&operator);
+        initialize<AptosCoin>(&operator, beneficiary_addr, beneficiary_addr);
 
         assert!(coin::balance<AptosCoin>(operator_addr) == 100000, 0);
 
@@ -295,9 +268,7 @@ module std::red_packet_tests {
         let operator_addr = signer::address_of(&operator);
         let beneficiary_addr = signer::address_of(&beneficiary);
 
-        initialize(&operator, beneficiary_addr, beneficiary_addr);
-
-        register_coin<TestCoin>(&operator);
+        initialize<TestCoin>(&operator, beneficiary_addr, beneficiary_addr);
 
         assert!(coin::balance<AptosCoin>(operator_addr) == 1000, 0);
         assert!(coin::balance<TestCoin>(operator_addr) == 100000, 1);
@@ -360,9 +331,7 @@ module std::red_packet_tests {
         let creator_addr = signer::address_of(&creator);
         let beneficiary_addr = signer::address_of(&beneficiary);
 
-        initialize(&operator, beneficiary_addr, beneficiary_addr);
-
-        register_coin<AptosCoin>(&operator);
+        initialize<AptosCoin>(&operator, beneficiary_addr, beneficiary_addr);
 
         assert!(coin::balance<AptosCoin>(creator_addr) == 100000, 0);
 
@@ -438,9 +407,7 @@ module std::red_packet_tests {
         let creator_addr = signer::address_of(&creator);
         let beneficiary_addr = signer::address_of(&beneficiary);
 
-        initialize(&operator, beneficiary_addr, beneficiary_addr);
-
-        register_coin<TestCoin>(&operator);
+        initialize<TestCoin>(&operator, beneficiary_addr, beneficiary_addr);
 
         assert!(coin::balance<TestCoin>(creator_addr) == 100000, 0);
         assert!(coin::balance<AptosCoin>(creator_addr) == 1000, 1);
@@ -506,9 +473,7 @@ module std::red_packet_tests {
         let creator_addr = signer::address_of(&creator);
         let beneficiary_addr = signer::address_of(&beneficiary);
 
-        initialize(&operator, beneficiary_addr, beneficiary_addr);
-
-        register_coin<AptosCoin>(&operator);
+        initialize<AptosCoin>(&operator, beneficiary_addr, beneficiary_addr);
 
         assert!(coin::balance<AptosCoin>(creator_addr) == 100000, 0);
         assert!(red_packet::current_id() == 1, 1);
@@ -580,9 +545,8 @@ module std::red_packet_tests {
         let admin_addr = signer::address_of(&admin);
         let new_admin_addr = signer::address_of(&new_admin);
 
-        initialize(&operator, beneficiary_addr, admin_addr);
+        initialize<AptosCoin>(&operator, beneficiary_addr, admin_addr);
         red_packet::check_operator(operator_addr, true);
-        register_coin<AptosCoin>(&operator);
 
         assert!(red_packet::admin() == admin_addr, 0);
         set_admin(&operator, new_admin_addr);
@@ -634,9 +598,8 @@ module std::red_packet_tests {
         let beneficiary_addr = signer::address_of(&beneficiary);
         let admin_addr = signer::address_of(&admin);
 
-        initialize(&operator, beneficiary_addr, admin_addr);
+        initialize<AptosCoin>(&operator, beneficiary_addr, admin_addr);
         red_packet::check_operator(operator_addr, true);
-        register_coin<AptosCoin>(&operator);
 
         // 2.5%
         assert!(red_packet::fee_point() == 250, 0);
@@ -667,9 +630,8 @@ module std::red_packet_tests {
         let beneficiary_addr = signer::address_of(&beneficiary);
         let admin_addr = signer::address_of(&admin);
 
-        initialize(&operator, beneficiary_addr, admin_addr);
+        initialize<AptosCoin>(&operator, beneficiary_addr, admin_addr);
         red_packet::check_operator(operator_addr, true);
-        register_coin<AptosCoin>(&operator);
 
         // 4
         assert!(red_packet::base_prepaid() == 4, 0);
