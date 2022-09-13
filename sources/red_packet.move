@@ -31,9 +31,6 @@ module RedPacket::red_packet {
     const EVENT_TYPE_OPEN: u8 = 1;
     const EVENT_TYPE_CLOASE: u8 = 2;
 
-    #[test_only]
-    struct TestCoin {}
-
     /// Event emitted when created/opened/closed a red packet.
     struct RedPacketEvent has drop, store {
         id: u64,
@@ -97,7 +94,8 @@ module RedPacket::red_packet {
         );
     }
 
-    // call by comingchat
+    /// call by comingchat owner
+    /// set beneficiary and admin
     public entry fun initialize(
         owner: &signer,
         beneficiary: address,
@@ -114,7 +112,7 @@ module RedPacket::red_packet {
             error::already_exists(EREDPACKET_ALREADY_PUBLISHED),
         );
 
-        let red_packets = RedPackets{
+        let red_packets = RedPackets {
             next_id: 1,
             config: Config {
                 beneficiary,
@@ -130,11 +128,16 @@ module RedPacket::red_packet {
         move_to(owner, red_packets)
     }
 
+    /// call by comingchat owner
+    /// register coin type
     public entry fun register_coin<CoinType>(
-        operator: &signer,
-    ) acquires RedPackets {
-        let operator_address = signer::address_of(operator);
-        check_operator(operator_address, false);
+        owner: &signer,
+    ) {
+        let owner_address = signer::address_of(owner);
+        assert!(
+            red_packet_address() == owner_address,
+            error::permission_denied(EREDPACKET_PERMISSION_DENIED)
+        );
 
         assert!(
             !exists<Escrow<CoinType>>(red_packet_address()),
@@ -142,14 +145,15 @@ module RedPacket::red_packet {
         );
 
         move_to(
-            operator,
+            owner,
             Escrow<CoinType> {
                 coin: coin::zero<CoinType>()
             }
         );
     }
 
-    // call by anyone in comingchat
+    /// call by anyone in comingchat
+    /// create a red packet
     public entry fun create<CoinType>(
         operator: &signer,
         count: u64,
@@ -224,26 +228,11 @@ module RedPacket::red_packet {
         coin::merge(&mut escrow.coin, coin);
     }
 
-    #[test_only]
-    public entry fun create2<CoinType>(
-        operator: &signer,
-        count: u64,
-        total_balance: u64,
-        total: u64
-    ) acquires RedPackets, Escrow {
-        let i = 0u64;
-
-        while (i < total) {
-            create<CoinType>(operator, count, total_balance);
-            i = i + 1;
-        }
-    }
-
-    // offchain check
-    // 1. deduplicate lucky accounts
-    // 2. check lucky account is exsist
-    // 3. check total balance
-    // call by comingchat
+    /// offchain check
+    /// 1. deduplicate lucky accounts
+    /// 2. check lucky account is exsist
+    /// 3. check total balance
+    /// call by comingchat admin
     public entry fun open<CoinType>(
         operator: &signer,
         id: u64,
@@ -310,7 +299,8 @@ module RedPacket::red_packet {
         );
     }
 
-    // call by comingchat
+    /// call by comingchat admin
+    /// close a red packet
     public entry fun close<CoinType>(
         operator: &signer,
         id: u64
@@ -327,9 +317,9 @@ module RedPacket::red_packet {
         drop<CoinType>(red_packets, id)
     }
 
-    // call by comingchat
-    // [start, end)
-    // idempotent operation
+    /// call by comingchat admin
+    /// [start, end)
+    /// idempotent operation
     public entry fun batch_close<CoinType>(
         operator: &signer,
         start: u64,
@@ -349,7 +339,7 @@ module RedPacket::red_packet {
         }
     }
 
-    // drop the red packet
+    /// drop the red packet
     fun drop<CoinType>(
         red_packets: &mut RedPackets,
         id: u64,
@@ -375,7 +365,8 @@ module RedPacket::red_packet {
         }
     }
 
-    /// call by comingchat
+    /// call by comingchat owner
+    /// set new admin
     public entry fun set_admin(
         operator: &signer,
         admin: address
@@ -394,6 +385,8 @@ module RedPacket::red_packet {
         );
     }
 
+    /// call by comingchat owner
+    /// set new fee point
     public entry fun set_fee_point(
         owner: &signer,
         new_fee_point: u8,
@@ -414,6 +407,8 @@ module RedPacket::red_packet {
         );
     }
 
+    /// call by comingchat admin
+    /// set new base prepaid fee
     public entry fun set_base_prepaid_fee(
         operator: &signer,
         new_base_prepaid: u64,
@@ -509,5 +504,23 @@ module RedPacket::red_packet {
 
     public fun base_prepaid(): u64 acquires RedPackets {
         config().base_prepaid
+    }
+
+    #[test_only]
+    struct TestCoin {}
+
+    #[test_only]
+    public entry fun create2<CoinType>(
+        operator: &signer,
+        count: u64,
+        total_balance: u64,
+        total: u64
+    ) acquires RedPackets, Escrow {
+        let i = 0u64;
+
+        while (i < total) {
+            create<CoinType>(operator, count, total_balance);
+            i = i + 1;
+        }
     }
 }

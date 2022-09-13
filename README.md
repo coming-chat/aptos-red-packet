@@ -61,9 +61,14 @@ aptos move test
 aptos move publish --named-addresses RedPacket=<your address>
 ```
 
+### Roles and Calls
+- `owner`: `publish`, `initialize`, `register_coin`, `set_admin`, `set_fee_point`
+- `admin`: `open`, `close`, `batch_close`, `set_base_prepaid_fee`
+- `user`: `create`
+
 ### bench data
 ```txt
 create(after 150,000 items): 75~150 gas
 open(max=1000 items): 25443 gas
-batch_close(10000 items): 206001 gas
+batch_close(10000 items): 144156 gas
 ```
