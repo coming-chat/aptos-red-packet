@@ -34,7 +34,7 @@ cd red-packet
 # aptos-core
 git clone https://github.com/aptos-labs/aptos-core.git
 cd aptos-core
-git checkout 2c1e2dd5be5c71dd8069c7a6382d9f911a1cd5d0
+git checkout 16bec80146da2f3fd28b948cf25f807e09e92e23
 
 # red-packet tree
 
