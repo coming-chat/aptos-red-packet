@@ -70,10 +70,6 @@ module RedPacket::red_packet {
         coin: Coin<CoinType>,
     }
 
-    public fun red_packet_address(): address {
-        type_info::account_address(&type_info::type_of<RedPackets>())
-    }
-
     /// A helper function that returns the address of CoinType.
     public fun coin_address<CoinType>(): address {
         let type_info = type_info::type_of<CoinType>();
@@ -85,11 +81,11 @@ module RedPacket::red_packet {
         require_admin: bool
     ) acquires RedPackets {
         assert!(
-            exists<RedPackets>(red_packet_address()),
+            exists<RedPackets>(@RedPacket),
             error::already_exists(EREDPACKET_NOT_PUBLISHED),
         );
         assert!(
-            !require_admin || admin() == operator_address || red_packet_address() == operator_address,
+            !require_admin || admin() == operator_address || @RedPacket == operator_address,
             error::permission_denied(EREDPACKET_PERMISSION_DENIED),
         );
     }
@@ -103,12 +99,12 @@ module RedPacket::red_packet {
     ) {
         let owner_addr = signer::address_of(owner);
         assert!(
-            red_packet_address() == owner_addr,
+            @RedPacket == owner_addr,
             error::permission_denied(EREDPACKET_PERMISSION_DENIED),
         );
 
         assert!(
-            !exists<RedPackets>(red_packet_address()),
+            !exists<RedPackets>(@RedPacket),
             error::already_exists(EREDPACKET_ALREADY_PUBLISHED),
         );
 
@@ -160,7 +156,7 @@ module RedPacket::red_packet {
             error::invalid_argument(EREDPACKET_TOO_MANY),
         );
 
-        let red_packets = borrow_global_mut<RedPackets>(red_packet_address());
+        let red_packets = borrow_global_mut<RedPackets>(@RedPacket);
 
         let id = red_packets.next_id;
 
@@ -207,7 +203,7 @@ module RedPacket::red_packet {
     fun merge_coin<CoinType>(
         coin: Coin<CoinType>
     ) acquires Escrow {
-        let escrow = borrow_global_mut<Escrow<CoinType>>(red_packet_address());
+        let escrow = borrow_global_mut<Escrow<CoinType>>(@RedPacket);
         coin::merge(&mut escrow.coin, coin);
     }
 
@@ -232,7 +228,7 @@ module RedPacket::red_packet {
             error::invalid_argument(EACCOUNTS_BALANCES_LEN_MISMATCH),
         );
 
-        let red_packets = borrow_global_mut<RedPackets>(red_packet_address());
+        let red_packets = borrow_global_mut<RedPackets>(@RedPacket);
         assert!(
             bucket_table::contains(& red_packets.store, &id),
             error::not_found(EREDPACKET_NOT_FOUND),
@@ -240,7 +236,7 @@ module RedPacket::red_packet {
 
         let info = bucket_table::borrow_mut(&mut red_packets.store, id);
 
-        let escrow_coin = borrow_global_mut<Escrow<CoinType>>(red_packet_address());
+        let escrow_coin = borrow_global_mut<Escrow<CoinType>>(@RedPacket);
 
         let total = 0u64;
         let i = 0u64;
@@ -291,7 +287,7 @@ module RedPacket::red_packet {
         let operator_address = signer::address_of(operator);
         check_operator(operator_address, true);
 
-        let red_packets = borrow_global_mut<RedPackets>(red_packet_address());
+        let red_packets = borrow_global_mut<RedPackets>(@RedPacket);
         assert!(
             bucket_table::contains(& red_packets.store, &id),
             error::not_found(EREDPACKET_NOT_FOUND),
@@ -311,7 +307,7 @@ module RedPacket::red_packet {
         let operator_address = signer::address_of(operator);
         check_operator(operator_address, true);
 
-        let red_packets = borrow_global_mut<RedPackets>(red_packet_address());
+        let red_packets = borrow_global_mut<RedPackets>(@RedPacket);
 
         let id = start;
         while (id < end) {
@@ -328,7 +324,7 @@ module RedPacket::red_packet {
         id: u64,
     ) acquires Escrow {
         let info = bucket_table::remove(&mut red_packets.store, &id);
-        let escrow_coin = borrow_global_mut<Escrow<CoinType>>(red_packet_address());
+        let escrow_coin = borrow_global_mut<Escrow<CoinType>>(@RedPacket);
 
         event::emit_event<RedPacketEvent>(
             &mut red_packets.events,
@@ -376,7 +372,7 @@ module RedPacket::red_packet {
     ) acquires RedPackets {
         let operator_address = signer::address_of(owner);
         assert!(
-            red_packet_address() == operator_address,
+            @RedPacket == operator_address,
             error::invalid_argument(EREDPACKET_PERMISSION_DENIED),
         );
         let red_packets = borrow_global_mut<RedPackets>(operator_address);
@@ -424,11 +420,11 @@ module RedPacket::red_packet {
         id: u64
     ): (u64, u64) acquires RedPackets {
         assert!(
-            exists<RedPackets>(red_packet_address()),
+            exists<RedPackets>(@RedPacket),
             error::already_exists(EREDPACKET_NOT_PUBLISHED),
         );
 
-        let red_packets = borrow_global_mut<RedPackets>(red_packet_address());
+        let red_packets = borrow_global_mut<RedPackets>(@RedPacket);
         assert!(
             bucket_table::contains(& red_packets.store, &id),
             error::not_found(EREDPACKET_NOT_FOUND),
@@ -455,21 +451,21 @@ module RedPacket::red_packet {
 
     public fun current_id(): u64 acquires RedPackets {
         assert!(
-            exists<RedPackets>(red_packet_address()),
+            exists<RedPackets>(@RedPacket),
             error::already_exists(EREDPACKET_NOT_PUBLISHED),
         );
 
-        let red_packets = borrow_global<RedPackets>(red_packet_address());
+        let red_packets = borrow_global<RedPackets>(@RedPacket);
         red_packets.next_id
     }
 
     public fun config(): Config acquires RedPackets {
         assert!(
-            exists<RedPackets>(red_packet_address()),
+            exists<RedPackets>(@RedPacket),
             error::already_exists(EREDPACKET_NOT_PUBLISHED),
         );
 
-        let red_packets = borrow_global<RedPackets>(red_packet_address());
+        let red_packets = borrow_global<RedPackets>(@RedPacket);
         red_packets.config
     }
 
