@@ -1,5 +1,5 @@
 /// Copyright 2022 ComingChat Authors. Licensed under Apache-2.0 License.
-/// Copy from https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/move-examples/data_structures/sources/iterable_table.move
+/// Copy from https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/move-examples/data_structures/sources/bucket_table.move
 /// A bucket table implementation based on linear hashing. (https://en.wikipedia.org/wiki/Linear_hashing)
 /// Compare to Table, it uses less storage slots but has higher chance of collision, it's a trade-off between space and time.
 /// Compare to other implementation, linear hashing splits one bucket a time instead of doubling buckets when expanding to avoid unexpected gas cost.
