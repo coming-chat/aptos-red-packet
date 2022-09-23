@@ -9,7 +9,7 @@ module std::red_packet_tests {
 
     use RedPacket::red_packet::{
         Self, initialize, create, open, close, set_admin, set_base_prepaid_fee,
-        set_fee_point, batch_close, TestCoin
+        set_fee_point, batch_close, TestCoin, register_coin
     };
 
     #[test_only]
@@ -86,7 +86,7 @@ module std::red_packet_tests {
         );
 
         let operator_addr = signer::address_of(operator);
-        initialize<AptosCoin>(operator, beneficiary, beneficiary);
+        initialize(operator, beneficiary, beneficiary);
 
         red_packet::check_operator(operator_addr, true);
     }
@@ -96,7 +96,7 @@ module std::red_packet_tests {
         operator = @0x123,
         beneficiary = @0x234
     )]
-    #[expected_failure(abort_code = 524291)]
+    #[expected_failure(abort_code = 524289)]
     fun initialize_twice_should_fail(
         aptos_framework: signer,
         operator: &signer,
@@ -109,11 +109,11 @@ module std::red_packet_tests {
             vector<u64>[0, 0]
         );
 
-        initialize<AptosCoin>(operator, beneficiary, beneficiary);
+        initialize(operator, beneficiary, beneficiary);
 
         red_packet::check_operator(operator_addr, true);
 
-        initialize<AptosCoin>(operator, beneficiary, beneficiary);
+        initialize(operator, beneficiary, beneficiary);
     }
 
     #[test(
@@ -121,7 +121,7 @@ module std::red_packet_tests {
         beneficiary = @0x234,
         lucky = @0x345
     )]
-    #[expected_failure(abort_code = 327682)]
+    #[expected_failure(abort_code = 327683)]
     fun initialize_other_should_fail(
         aptos_framework: signer,
         lucky: &signer,
@@ -134,7 +134,7 @@ module std::red_packet_tests {
             vector<u64>[0, 0]
         );
 
-        initialize<AptosCoin>(lucky, beneficiary, beneficiary);
+        initialize(lucky, beneficiary, beneficiary);
     }
 
     #[test(
@@ -154,9 +154,11 @@ module std::red_packet_tests {
             vector<u64>[10000, 0]
         );
 
-        initialize<AptosCoin>(&operator, beneficiary, beneficiary);
+        initialize(&operator, beneficiary, beneficiary);
 
-        create<AptosCoin>(&operator, 10, 10000);
+        register_coin<AptosCoin>(&operator);
+
+        create<AptosCoin>(&operator, 0, 10, 10000);
 
         assert!(coin::balance<AptosCoin>(beneficiary) == 250, 0);
     }
@@ -183,16 +185,18 @@ module std::red_packet_tests {
         // beneficiary, receive TestCoin
         setup_test_coin(&operator, &beneficiary, 0);
 
-        initialize<TestCoin>(&operator, beneficiary_addr, beneficiary_addr);
+        initialize(&operator, beneficiary_addr, beneficiary_addr);
+
+        register_coin<TestCoin>(&operator);
 
         assert!(coin::balance<TestCoin>(operator_addr) == 10000, 0);
         assert!(coin::balance<AptosCoin>(operator_addr) == 1000, 1);
 
-        assert!(red_packet::base_prepaid() == 4, 2);
+        assert!(red_packet::base_prepaid(0) == 4, 2);
 
         // 1. pay some prepaid fee to admin: 4 * 10 = 40
         // 2. trasfer some TestCoin to contract: 10000
-        create<TestCoin>(&operator, 10, 10000);
+        create<TestCoin>(&operator, 0, 10, 10000);
 
         assert!(coin::balance<TestCoin>(beneficiary_addr) == 250, 3);
         assert!(coin::balance<AptosCoin>(operator_addr) == 960, 4);
@@ -219,17 +223,19 @@ module std::red_packet_tests {
             vector<u64>[100000, 0, 0, 0]
         );
 
-        initialize<AptosCoin>(&operator, beneficiary, beneficiary);
+        initialize(&operator, beneficiary, beneficiary);
+
+        register_coin<AptosCoin>(&operator);
 
         assert!(coin::balance<AptosCoin>(operator_addr) == 100000, 0);
 
-        create<AptosCoin>(&operator, 2, 10000);
+        create<AptosCoin>(&operator, 0, 2, 10000);
 
-        assert!(red_packet::current_id() == 2, 1);
-        assert!(red_packet::remain_count(1) == 2, 2);
+        assert!(red_packet::next_id(0) == 2, 1);
+        assert!(red_packet::remain_count(0, 1) == 2, 2);
 
         // 97.5%
-        assert!(red_packet::escrow_coins(1) == 10000 - 250, 3);
+        assert!(red_packet::escrow_coins(0, 1) == 10000 - 250, 3);
         // 2.5%
         assert!(coin::balance<AptosCoin>(beneficiary) == 250, 4);
 
@@ -237,13 +243,14 @@ module std::red_packet_tests {
 
         open<AptosCoin>(
             &operator,
+            0,
             1,
             vector<address>[lucky1, lucky2],
             vector<u64>[1000, 8750]
         );
 
-        assert!(red_packet::remain_count(1) == 0, 6);
-        assert!(red_packet::escrow_coins(1) == 0, 7);
+        assert!(red_packet::remain_count(0, 1) == 0, 6);
+        assert!(red_packet::escrow_coins(0, 1) == 0, 7);
 
         assert!(coin::balance<AptosCoin>(lucky1) == 1000, 8);
         assert!(coin::balance<AptosCoin>(lucky2) == 8750, 9);
@@ -281,20 +288,22 @@ module std::red_packet_tests {
         // lucky account, receive TestCoin
         setup_test_coin(&operator, &lucky2, 0);
 
-        initialize<TestCoin>(&operator, beneficiary_addr, beneficiary_addr);
+        initialize(&operator, beneficiary_addr, beneficiary_addr);
+
+        register_coin<TestCoin>(&operator);
 
         assert!(coin::balance<AptosCoin>(operator_addr) == 1000, 0);
         assert!(coin::balance<TestCoin>(operator_addr) == 100000, 1);
 
-        create<TestCoin>(&operator, 2, 10000);
+        create<TestCoin>(&operator, 0, 2, 10000);
         // prepaid fee: 2 * 4 = 8
         assert!(coin::balance<AptosCoin>(operator_addr) == 1000 - 2 * 4, 2);
 
-        assert!(red_packet::current_id() == 2, 3);
-        assert!(red_packet::remain_count(1) == 2, 4);
+        assert!(red_packet::next_id(0) == 2, 3);
+        assert!(red_packet::remain_count(0, 1) == 2, 4);
 
         // 97.5%
-        assert!(red_packet::escrow_coins(1) == 10000 - 250, 5);
+        assert!(red_packet::escrow_coins(0, 1) == 10000 - 250, 5);
         // 2.5%
         assert!(coin::balance<TestCoin>(beneficiary_addr) == 250, 6);
 
@@ -302,13 +311,14 @@ module std::red_packet_tests {
 
         open<TestCoin>(
             &operator,
+            0,
             1,
             vector<address>[lucky1_addr, lucky2_addr],
             vector<u64>[1000, 8750]
         );
 
-        assert!(red_packet::remain_count(1) == 0, 8);
-        assert!(red_packet::escrow_coins(1) == 0, 9);
+        assert!(red_packet::remain_count(0, 1) == 0, 8);
+        assert!(red_packet::escrow_coins(0, 1) == 0, 9);
 
         assert!(coin::balance<TestCoin>(lucky1_addr) == 1000, 10);
         assert!(coin::balance<TestCoin>(lucky2_addr) == 8750, 11);
@@ -338,17 +348,19 @@ module std::red_packet_tests {
             vector<u64>[0, 100000, 0, 0, 0]
         );
 
-        initialize<AptosCoin>(&operator, beneficiary, beneficiary);
+        initialize(&operator, beneficiary, beneficiary);
+
+        register_coin<AptosCoin>(&operator);
 
         assert!(coin::balance<AptosCoin>(creator_addr) == 100000, 0);
 
-        create<AptosCoin>(&creator, 3, 30000);
+        create<AptosCoin>(&creator, 0, 3, 30000);
 
-        assert!(red_packet::current_id() == 2, 1);
-        assert!(red_packet::remain_count(1) == 3, 2);
+        assert!(red_packet::next_id(0) == 2, 1);
+        assert!(red_packet::remain_count(0, 1) == 3, 2);
 
         // 97.5%
-        assert!(red_packet::escrow_coins(1) == 30000 - 750 , 3);
+        assert!(red_packet::escrow_coins(0, 1) == 30000 - 750 , 3);
         // 2.5%
         assert!(coin::balance<AptosCoin>(beneficiary) == 750, 4);
 
@@ -356,15 +368,16 @@ module std::red_packet_tests {
 
         open<AptosCoin>(
             &operator,
+            0,
             1,
             vector<address>[lucky1, lucky2],
             vector<u64>[1000, 9000]
         );
 
-        assert!(red_packet::remain_count(1) == 1, 7);
-        assert!(red_packet::escrow_coins(1) == 19250, 8);
+        assert!(red_packet::remain_count(0, 1) == 1, 7);
+        assert!(red_packet::escrow_coins(0, 1) == 19250, 8);
 
-        close<AptosCoin>(&operator, 1);
+        close<AptosCoin>(&operator, 0, 1);
 
         assert!(coin::balance<AptosCoin>(lucky1) == 1000, 9);
         assert!(coin::balance<AptosCoin>(lucky2) == 9000, 10);
@@ -409,20 +422,22 @@ module std::red_packet_tests {
         let creator_addr = signer::address_of(&creator);
         let beneficiary_addr = signer::address_of(&beneficiary);
 
-        initialize<TestCoin>(&operator, beneficiary_addr, beneficiary_addr);
+        initialize(&operator, beneficiary_addr, beneficiary_addr);
+
+        register_coin<TestCoin>(&operator);
 
         assert!(coin::balance<TestCoin>(creator_addr) == 100000, 0);
         assert!(coin::balance<AptosCoin>(creator_addr) == 1000, 1);
 
-        create<TestCoin>(&creator, 3, 30000);
+        create<TestCoin>(&creator, 0, 3, 30000);
 
         assert!(coin::balance<AptosCoin>(creator_addr) == 1000 - 3 * 4, 1);
 
-        assert!(red_packet::current_id() == 2, 1);
-        assert!(red_packet::remain_count(1) == 3, 2);
+        assert!(red_packet::next_id(0) == 2, 1);
+        assert!(red_packet::remain_count(0, 1) == 3, 2);
 
         // 97.5%
-        assert!(red_packet::escrow_coins(1) == 30000 - 750 , 3);
+        assert!(red_packet::escrow_coins(0, 1) == 30000 - 750 , 3);
         // 2.5%
         assert!(coin::balance<TestCoin>(beneficiary_addr) == 750, 4);
 
@@ -430,15 +445,16 @@ module std::red_packet_tests {
 
         open<TestCoin>(
             &operator,
+            0,
             1,
             vector<address>[lucky1_addr, lucky2_addr],
             vector<u64>[1000, 9000]
         );
 
-        assert!(red_packet::remain_count(1) == 1, 7);
-        assert!(red_packet::escrow_coins(1) == 19250, 8);
+        assert!(red_packet::remain_count(0, 1) == 1, 7);
+        assert!(red_packet::escrow_coins(0, 1) == 19250, 8);
 
-        close<TestCoin>(&operator, 1);
+        close<TestCoin>(&operator, 0, 1);
 
         assert!(coin::balance<TestCoin>(lucky1_addr) == 1000, 9);
         assert!(coin::balance<TestCoin>(lucky2_addr) == 9000, 10);
@@ -469,24 +485,26 @@ module std::red_packet_tests {
             vector<u64>[0, 100000, 0, 0, 0]
         );
 
-        initialize<AptosCoin>(&operator, beneficiary, beneficiary);
+        initialize(&operator, beneficiary, beneficiary);
+
+        register_coin<AptosCoin>(&operator);
 
         assert!(coin::balance<AptosCoin>(creator_addr) == 100000, 0);
-        assert!(red_packet::current_id() == 1, 1);
+        assert!(red_packet::next_id(0) == 1, 1);
 
-        create<AptosCoin>(&creator, 3, 30000);
-        create<AptosCoin>(&creator, 3, 30000);
-        create<AptosCoin>(&creator, 3, 30000);
+        create<AptosCoin>(&creator, 0, 3, 30000);
+        create<AptosCoin>(&creator, 0, 3, 30000);
+        create<AptosCoin>(&creator, 0, 3, 30000);
 
-        assert!(red_packet::current_id() == 4, 2);
-        assert!(red_packet::remain_count(1) == 3, 3);
-        assert!(red_packet::remain_count(2) == 3, 4);
-        assert!(red_packet::remain_count(3) == 3, 5);
+        assert!(red_packet::next_id(0) == 4, 2);
+        assert!(red_packet::remain_count(0, 1) == 3, 3);
+        assert!(red_packet::remain_count(0, 2) == 3, 4);
+        assert!(red_packet::remain_count(0, 3) == 3, 5);
 
         // 97.5%
-        assert!(red_packet::escrow_coins(1) == 30000 - 750 , 6);
-        assert!(red_packet::escrow_coins(2) == 30000 - 750 , 7);
-        assert!(red_packet::escrow_coins(3) == 30000 - 750 , 8);
+        assert!(red_packet::escrow_coins(0, 1) == 30000 - 750 , 6);
+        assert!(red_packet::escrow_coins(0, 2) == 30000 - 750 , 7);
+        assert!(red_packet::escrow_coins(0, 3) == 30000 - 750 , 8);
 
         // 2.5%
         assert!(coin::balance<AptosCoin>(beneficiary) == 750 * 3, 9);
@@ -495,17 +513,18 @@ module std::red_packet_tests {
 
         open<AptosCoin>(
             &operator,
+            0,
             1,
             vector<address>[lucky1, lucky2],
             vector<u64>[1000, 9000]
         );
 
-        assert!(red_packet::remain_count(1) == 1, 11);
-        assert!(red_packet::escrow_coins(1) == 19250, 12);
+        assert!(red_packet::remain_count(0, 1) == 1, 11);
+        assert!(red_packet::escrow_coins(0, 1) == 19250, 12);
 
-        batch_close<AptosCoin>(&operator, 1, 4);
+        batch_close<AptosCoin>(&operator, 0, 1, 4);
         // batch close again
-        batch_close<AptosCoin>(&operator, 1, 4);
+        batch_close<AptosCoin>(&operator, 0, 1, 4);
 
         assert!(coin::balance<AptosCoin>(lucky1) == 1000, 13);
         assert!(coin::balance<AptosCoin>(lucky2) == 9000, 14);
@@ -535,20 +554,23 @@ module std::red_packet_tests {
             vector<u64>[0, 0, 10000, 100]
         );
 
-        initialize<AptosCoin>(&operator, beneficiary, admin_addr);
+        initialize(&operator, beneficiary, admin_addr);
+
+        register_coin<AptosCoin>(&operator);
+
         red_packet::check_operator(operator_addr, true);
 
         assert!(red_packet::admin() == admin_addr, 0);
         set_admin(&operator, new_admin_addr);
         assert!(red_packet::admin() == new_admin_addr, 1);
 
-        assert!(red_packet::base_prepaid() == 4, 2);
+        assert!(red_packet::base_prepaid(0) == 4, 2);
 
-        create<AptosCoin>(&admin, 1, 10000);
+        create<AptosCoin>(&admin, 0, 1, 10000);
 
         // 97.5%
 
-        assert!(red_packet::escrow_coins(1) == 10000 - 250, 3);
+        assert!(red_packet::escrow_coins(0, 1) == 10000 - 250, 3);
 
         // 2.5%
 
@@ -557,6 +579,7 @@ module std::red_packet_tests {
 
         open<AptosCoin>(
             &new_admin,
+            0,
             1,
             vector<address>[admin_addr],
             vector<u64>[10000 - 250 - 100]
@@ -564,7 +587,7 @@ module std::red_packet_tests {
         assert!(coin::balance<AptosCoin>(admin_addr) == 10000 - 250 - 100, 6);
         assert!(coin::balance<AptosCoin>(new_admin_addr) == 100 + 4, 7);
 
-        close<AptosCoin>(&new_admin, 1);
+        close<AptosCoin>(&new_admin, 0, 1);
         assert!(coin::balance<AptosCoin>(beneficiary) == 250 - 4 + 100, 8);
     }
 
@@ -587,16 +610,19 @@ module std::red_packet_tests {
             vector<u64>[0, 0, 0]
         );
 
-        initialize<AptosCoin>(&operator, beneficiary, admin);
+        initialize(&operator, beneficiary, admin);
+
+        register_coin<AptosCoin>(&operator);
+
         red_packet::check_operator(operator_addr, true);
 
         // 2.5%
-        assert!(red_packet::fee_point() == 250, 0);
+        assert!(red_packet::fee_point(0) == 250, 0);
 
-        set_fee_point(&operator, 100);
+        set_fee_point(&operator, 0, 100);
 
         // 1%
-        assert!(red_packet::fee_point() == 100, 1);
+        assert!(red_packet::fee_point(0) == 100, 1);
     }
 
     #[test(
@@ -619,15 +645,18 @@ module std::red_packet_tests {
             vector<u64>[0, 0, 0]
         );
 
-        initialize<AptosCoin>(&operator, beneficiary, admin);
+        initialize(&operator, beneficiary, admin);
+
+        register_coin<AptosCoin>(&operator);
+
         red_packet::check_operator(operator_addr, true);
 
         // 4
-        assert!(red_packet::base_prepaid() == 4, 0);
+        assert!(red_packet::base_prepaid(0) == 4, 0);
 
-        set_base_prepaid_fee(&operator, 40);
+        set_base_prepaid_fee(&operator, 0, 40);
 
         // 40
-        assert!(red_packet::base_prepaid() == 40, 1);
+        assert!(red_packet::base_prepaid(0) == 40, 1);
     }
 }
