@@ -25,6 +25,7 @@ module RedPacket::red_packet {
     const EREDPACKET_ACCOUNT_TOO_MANY: u64 = 7;
     const EREDPACKET_BALANCE_TOO_LITTLE: u64 = 8;
     const EREDPACKET_HAS_REGISTERED: u64 = 9;
+    const EREDPACKET_COIN_TYPE_MISMATCH: u64 = 10;
 
     const EVENT_TYPE_CREATE: u8 = 0;
     const EVENT_TYPE_OPEN: u8 = 1;
@@ -197,6 +198,11 @@ module RedPacket::red_packet {
 
         let global = borrow_global_mut<GlobalConfig>(@RedPacket);
         let handler = vector::borrow_mut(&mut global.handlers, handler_index);
+        assert!(
+            handler.coin_type == type_info::type_name<CoinType>(),
+            EREDPACKET_COIN_TYPE_MISMATCH
+        );
+
         let id = handler.next_id;
         let info  = RedPacketInfo {
             remain_coin: 0,
@@ -282,10 +288,13 @@ module RedPacket::red_packet {
 
         let global = borrow_global_mut<GlobalConfig>(@RedPacket);
         let handler = vector::borrow_mut(&mut global.handlers, handler_index);
-
         assert!(
             bucket_table::contains(&handler.store, &id),
             error::not_found(EREDPACKET_NOT_FOUND),
+        );
+        assert!(
+            handler.coin_type == type_info::type_name<CoinType>(),
+            EREDPACKET_COIN_TYPE_MISMATCH
         );
 
         // 3. check red packet stats
@@ -356,10 +365,13 @@ module RedPacket::red_packet {
 
         let global = borrow_global_mut<GlobalConfig>(@RedPacket);
         let handler = vector::borrow_mut(&mut global.handlers, handler_index);
-
         assert!(
             bucket_table::contains(&handler.store, &id),
             error::not_found(EREDPACKET_NOT_FOUND),
+        );
+        assert!(
+            handler.coin_type == type_info::type_name<CoinType>(),
+            EREDPACKET_COIN_TYPE_MISMATCH
         );
 
         // 3. drop the red packet
@@ -380,6 +392,10 @@ module RedPacket::red_packet {
 
         let global = borrow_global_mut<GlobalConfig>(@RedPacket);
         let handler = vector::borrow_mut(&mut global.handlers, handler_index);
+        assert!(
+            handler.coin_type == type_info::type_name<CoinType>(),
+            EREDPACKET_COIN_TYPE_MISMATCH
+        );
 
         let id = start;
         while (id < end) {
