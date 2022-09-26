@@ -200,7 +200,7 @@ module RedPacket::red_packet {
         let handler = vector::borrow_mut(&mut global.handlers, handler_index);
         assert!(
             handler.coin_type == type_info::type_name<CoinType>(),
-            EREDPACKET_COIN_TYPE_MISMATCH
+            error::invalid_argument(EREDPACKET_COIN_TYPE_MISMATCH)
         );
 
         let id = handler.next_id;
@@ -294,7 +294,7 @@ module RedPacket::red_packet {
         );
         assert!(
             handler.coin_type == type_info::type_name<CoinType>(),
-            EREDPACKET_COIN_TYPE_MISMATCH
+            error::invalid_argument(EREDPACKET_COIN_TYPE_MISMATCH)
         );
 
         // 3. check red packet stats
@@ -371,7 +371,7 @@ module RedPacket::red_packet {
         );
         assert!(
             handler.coin_type == type_info::type_name<CoinType>(),
-            EREDPACKET_COIN_TYPE_MISMATCH
+            error::invalid_argument(EREDPACKET_COIN_TYPE_MISMATCH)
         );
 
         // 3. drop the red packet
@@ -394,7 +394,7 @@ module RedPacket::red_packet {
         let handler = vector::borrow_mut(&mut global.handlers, handler_index);
         assert!(
             handler.coin_type == type_info::type_name<CoinType>(),
-            EREDPACKET_COIN_TYPE_MISMATCH
+            error::invalid_argument(EREDPACKET_COIN_TYPE_MISMATCH)
         );
 
         let id = start;
