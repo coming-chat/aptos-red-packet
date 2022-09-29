@@ -5,14 +5,9 @@ license = "Apache-2.0"
 
 [dependencies]
 #AptosFramework = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/aptos-framework/", rev = "a5ac706f74c3b5088649e744b76ec6ed32635c0d" }
-#AptosStdlib = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/aptos-stdlib", rev = "a5ac706f74c3b5088649e744b76ec6ed32635c0d" }
 AptosFramework = { local = "./aptos-core/aptos-move/framework/aptos-framework" }
-AptosStdlib = { local = "./aptos-core/aptos-move/framework/aptos-stdlib" }
 
 [addresses]
-std = "0x1"
-aptos_std = "0x1"
-aptos_framework = "0x1"
 RedPacket = "_"
 
 [dev-addresses]
