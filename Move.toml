@@ -2,9 +2,13 @@
 name = "red-packet"
 version = "0.2.0"
 license = "Apache-2.0"
+upgrade_policy = "compatible"
 
+#[dependencies.AptosFramework]
+#git = 'https://github.com/aptos-labs/aptos-core.git'
+#rev = 'main'
+#subdir = 'aptos-move/framework/aptos-framework'
 [dependencies]
-#AptosFramework = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/aptos-framework/", rev = "a5ac706f74c3b5088649e744b76ec6ed32635c0d" }
 AptosFramework = { local = "./aptos-core/aptos-move/framework/aptos-framework" }
 
 [addresses]

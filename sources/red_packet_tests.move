@@ -1,5 +1,6 @@
+// Copyright 2022 ComingChat Authors. Licensed under Apache-2.0 License.
 #[test_only]
-module std::red_packet_tests {
+module RedPacket::red_packet_tests {
     use std::signer;
     use std::vector;
     use aptos_framework::aptos_coin::{Self, AptosCoin};

@@ -6,9 +6,9 @@ A red packet social application that combines the privacy chat on ComingChat and
 The code contract will be deployed to the Aptos/Sui smart contract platform
 
 ### Supported dependencies
-- aptos-cli: `Aptos CLI Release v0.3.5`
-- AptosFramework: `main @ a5ac706f74c3b5088649e744b76ec6ed32635c0d`
-- AptosStdlib: `main @ a5ac706f74c3b5088649e744b76ec6ed32635c0d`
+- aptos-cli: `Aptos CLI Release v1.0.0`
+- AptosFramework: `main @ 01108a2345b87d539d54a67b32db55193f9ace40`
+- AptosStdlib: `main @ 01108a2345b87d539d54a67b32db55193f9ace40`
 
 ### Roles and Calls
 - `owner`: `publish`, `initialize`, `set_admin`, `set_fee_point`
